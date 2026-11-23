@@ -2,6 +2,7 @@
 import json
 import os
 import secrets
+import time
 import sqlite3
 from datetime import datetime
 from functools import wraps
@@ -154,7 +155,18 @@ def create_app(config=None):
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
+            naam = request.form["naam"].strip().lower()
+            nu_ts = time.time()
+            db().execute("DELETE FROM login_poging WHERE tijd<?", (nu_ts - 900,))
+            mislukt = db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel IN (?,?)",
+                                   ("n:" + naam, "ip:" + (request.remote_addr or ""))).fetchone()["c"]
+            if mislukt >= 10:
+                flash("Te veel mislukte pogingen. Probeer het over 15 minuten opnieuw.")
+                return render_template("login.html"), 429
             u = db().execute("SELECT * FROM gebruiker WHERE naam=?", (request.form["naam"].strip(),)).fetchone()
+            if not (u and check_password_hash(u["hash"], request.form["wachtwoord"])):
+                for k in ("n:" + naam, "ip:" + (request.remote_addr or "")):
+                    db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, k))
             if u and check_password_hash(u["hash"], request.form["wachtwoord"]):
                 session.clear()
                 session["uid"], session["naam"] = u["id"], u["naam"]

@@ -33,4 +33,4 @@ python -m pytest
 Bijdragen zijn welkom via pull requests.
 
 ## Roadmap
-Pushmeldingen bij storing, automatisch printen (kiosk), 2FA voor beheerder/coördinator, rate limiting, optionele Epson ePOS-printer, Postgres, historie per verkiezing.
+Pushmeldingen bij storing, automatisch printen (kiosk), 2FA (TOTP) voor beheerder/coördinator, optionele Epson ePOS-printer, Postgres, historie per verkiezing.
