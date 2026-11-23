@@ -652,6 +652,57 @@ def create_app(config=None):
         audit(f"gebruiker {f['naam']} aangemaakt")
         return redirect(url_for("beheer_gebruikers"))
 
+    def tijdelijk_wachtwoord():
+        alfabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        return "".join(secrets.choice(alfabet) for _ in range(12))
+
+    @app.post("/beheer/gebruikers/selectie")
+    @rol_vereist("beheerder")
+    def gebruikers_selectie():
+        actie = request.form.get("actie", "")
+        ids = [i for i in request.form.getlist("uid", type=int) if i != g.gebruiker["id"]]
+        if not ids:
+            flash("Selecteer eerst één of meer gebruikers (jezelf kun je hier niet wijzigen).")
+            return redirect(url_for("beheer_gebruikers"))
+        marks = ",".join("?" * len(ids))
+        gekozen = db().execute(f"SELECT u.*, r.nummer AS route_nummer FROM gebruiker u "
+                               f"LEFT JOIN route r ON r.id=u.route_id WHERE u.id IN ({marks}) ORDER BY u.naam", ids).fetchall()
+        if actie == "wachtwoord":
+            uit = []
+            for u in gekozen:
+                ww = tijdelijk_wachtwoord()
+                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1 WHERE id=?", (generate_password_hash(ww), u["id"]))
+                uit.append((u["naam"], u["route_nummer"], ww))
+            audit(f"selectie: {len(uit)} wachtwoorden opnieuw ingesteld")
+            return (render_template("bulk.html", routes=routes(), resultaat=uit, overgeslagen=[],
+                                    melding=f"{len(uit)} nieuwe tijdelijke wachtwoorden ingesteld."),
+                    200, {"Cache-Control": "no-store"})
+        if actie == "wijzig_verplicht":
+            db().execute(f"UPDATE gebruiker SET moet_wijzigen=1 WHERE id IN ({marks})", ids)
+            flash(f"{len(ids)} gebruiker(s) moeten hun wachtwoord wijzigen bij de volgende login.")
+        elif actie == "reset2fa":
+            db().execute(f"UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0, herstel='[]' WHERE id IN ({marks})", ids)
+            flash(f"2FA gereset voor {len(ids)} gebruiker(s).")
+        elif actie == "route":
+            rid = request.form.get("route_id", type=int)
+            if not db().execute("SELECT 1 FROM route WHERE id=?", (rid,)).fetchone():
+                flash("Kies een route.")
+                return redirect(url_for("beheer_gebruikers"))
+            n = db().execute(f"UPDATE gebruiker SET route_id=? WHERE rol='chauffeur' AND id IN ({marks})", [rid] + ids).rowcount
+            flash(f"Route gewijzigd voor {n} chauffeur(s); anderen zijn overgeslagen.")
+        elif actie == "verwijder":
+            beheerders_over = db().execute(
+                f"SELECT COUNT(*) c FROM gebruiker WHERE rol='beheerder' AND id NOT IN ({marks})", ids).fetchone()["c"]
+            if beheerders_over < 1:
+                flash("Je kunt niet alle beheerders verwijderen.")
+                return redirect(url_for("beheer_gebruikers"))
+            db().execute(f"DELETE FROM gebruiker WHERE id IN ({marks})", ids)
+            flash(f"{len(ids)} gebruiker(s) verwijderd.")
+        else:
+            abort(400, "Onbekende actie")
+        audit(f"selectie: {actie} voor {len(ids)} gebruiker(s)")
+        return redirect(url_for("beheer_gebruikers"))
+
     @app.route("/beheer/gebruikers/bulk", methods=["GET", "POST"])
     @rol_vereist("beheerder")
     def gebruikers_bulk():
@@ -659,13 +710,12 @@ def create_app(config=None):
             return render_template("bulk.html", routes=routes(), resultaat=None)
         voorvoegsel = "".join(ch for ch in request.form.get("voorvoegsel", "route").strip() if ch.isalnum() or ch in "-_") or "route"
         gekozen = set(request.form.getlist("route_id", type=int))
-        alfabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
         gemaakt, overgeslagen = [], []
         for r in routes():
             if r["id"] not in gekozen:
                 continue
             naam = f"{voorvoegsel}{r['nummer']}"
-            ww = "".join(secrets.choice(alfabet) for _ in range(12))
+            ww = tijdelijk_wachtwoord()
             try:
                 db().execute("INSERT INTO gebruiker (naam,hash,rol,route_id,moet_wijzigen) VALUES (?,?,'chauffeur',?,1)",
                              (naam, generate_password_hash(ww), r["id"]))
@@ -673,7 +723,8 @@ def create_app(config=None):
             except sqlite3.IntegrityError:
                 overgeslagen.append(naam)
         audit(f"bulk: {len(gemaakt)} chauffeursaccounts aangemaakt")
-        resp = render_template("bulk.html", routes=routes(), resultaat=gemaakt, overgeslagen=overgeslagen)
+        resp = render_template("bulk.html", routes=routes(), resultaat=gemaakt, overgeslagen=overgeslagen,
+                               melding=f"{len(gemaakt)} accounts aangemaakt.")
         return resp, 200, {"Cache-Control": "no-store"}
 
     @app.post("/beheer/gebruikers/<int:uid>/verwijder")

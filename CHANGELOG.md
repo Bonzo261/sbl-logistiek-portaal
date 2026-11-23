@@ -5,6 +5,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 ## [Niet uitgebracht]
 
 ### Toegevoegd
+- Acties op een selectie gebruikers: nieuw tijdelijk wachtwoord (printbare lijst), wachtwoordwijziging afdwingen, 2FA resetten, route wijzigen en verwijderen
 - Bulk aanmaken van chauffeursaccounts per route (`route1`, `route2`, …) met een uniek tijdelijk wachtwoord; printbare lijst die één keer getoond wordt
 - Verplichte wachtwoordwijziging bij de eerste login voor bulk-accounts en na een wachtwoordreset door de beheerder
 - Back-up downloaden en herstellen vanuit de webinterface

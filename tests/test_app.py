@@ -245,3 +245,38 @@ def test_bulk_accounts_en_verplichte_wijziging(client):
     assert c.get("/route/1").status_code == 403
     post(c, "/logout", tokenurl="/route/2")
     assert post(c, "/login", {"naam": naam, "wachtwoord": tijdelijk}).get_data(as_text=True).count("Onjuiste") == 1
+
+
+def test_selectie_acties(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "3"}, "/beheer")
+    post(c, "/beheer/gebruikers/bulk", {"voorvoegsel": "route", "route_id": ["1", "2", "3"]}, "/beheer/gebruikers/bulk")
+    html = c.get("/beheer/gebruikers").get_data(as_text=True)
+    ids = re.findall(r'class="sel" name="uid" value="(\d+)"', html)
+    assert len(ids) == 3 and html.count('name="uid"') == 3  # admin zelf niet selecteerbaar
+    # nieuwe wachtwoorden voor selectie
+    r = post(c, "/beheer/gebruikers/selectie", {"actie": "wachtwoord", "uid": ids[:2]}, "/beheer/gebruikers")
+    assert "2 nieuwe tijdelijke wachtwoorden" in r.get_data(as_text=True)
+    assert len(re.findall(r"<code>\w{12}</code>", r.get_data(as_text=True))) == 2
+    # route wijzigen
+    post(c, "/beheer/gebruikers/selectie", {"actie": "route", "uid": [ids[0]], "route_id": "3"}, "/beheer/gebruikers")
+    assert "Route wijzigen" in c.get("/beheer/gebruikers").get_data(as_text=True)
+    # zonder selectie: melding
+    r = post(c, "/beheer/gebruikers/selectie", {"actie": "verwijder"}, "/beheer/gebruikers", follow_redirects=True)
+    assert "Selecteer eerst" in r.get_data(as_text=True)
+    # onbekende actie
+    assert post(c, "/beheer/gebruikers/selectie", {"actie": "boem", "uid": ids}, "/beheer/gebruikers").status_code == 400
+    # verwijderen
+    post(c, "/beheer/gebruikers/selectie", {"actie": "verwijder", "uid": ids}, "/beheer/gebruikers")
+    assert 'name="uid"' not in c.get("/beheer/gebruikers").get_data(as_text=True)
+
+
+def test_laatste_beheerder_niet_verwijderen(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "b2", "wachtwoord": "langwachtwoord2", "rol": "beheerder"}, "/beheer/gebruikers")
+    ids = re.findall(r'class="sel" name="uid" value="(\d+)"', c.get("/beheer/gebruikers").get_data(as_text=True))
+    # admin (ikzelf) blijft altijd over; b2 mag dus weg
+    post(c, "/beheer/gebruikers/selectie", {"actie": "verwijder", "uid": ids}, "/beheer/gebruikers")
+    assert 'name="uid"' not in c.get("/beheer/gebruikers").get_data(as_text=True)

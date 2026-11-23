@@ -1,6 +1,6 @@
 {% extends "basis.html" %}{% block inhoud %}
 <p><a class="knop grijs" href="{{ url_for('beheer_gebruikers') }}">← Terug naar gebruikers</a></p>
-<h1>Chauffeursaccounts per route aanmaken</h1>
+<h1>{% if resultaat is none %}Chauffeursaccounts per route aanmaken{% else %}Tijdelijke wachtwoorden{% endif %}</h1>
 {% if resultaat is none %}
 <form method="post" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <p>Per gekozen route wordt één chauffeursaccount aangemaakt (bijv. <em>route1</em>, <em>route2</em>) met een willekeurig tijdelijk wachtwoord. Bij de eerste keer inloggen moet de gebruiker een eigen wachtwoord kiezen. Bestaande namen worden overgeslagen.</p>
@@ -9,9 +9,9 @@
 <p class="rij">{% for r in routes %}<label><input class="rk" type="checkbox" name="route_id" value="{{ r.id }}" checked> Route {{ r.nummer }}</label>{% endfor %}</p>
 <button class="groen">Accounts aanmaken</button></form>
 {% else %}
-<div class="kaart"><p><strong>{{ resultaat|length }} accounts aangemaakt.</strong> Dit zijn de tijdelijke wachtwoorden. <strong>Ze worden maar één keer getoond</strong>: print of bewaar deze lijst nu.</p>
+<div class="kaart"><p><strong>{{ melding }}</strong> Dit zijn de tijdelijke wachtwoorden. <strong>Ze worden maar één keer getoond</strong>: print of bewaar deze lijst nu.</p>
 {% if overgeslagen %}<p class="klein">Overgeslagen (bestond al): {{ overgeslagen|join(', ') }}</p>{% endif %}
 <table><tr><th>Route</th><th>Gebruikersnaam</th><th>Tijdelijk wachtwoord</th></tr>
-{% for naam, nr, ww in resultaat %}<tr><td>{{ nr }}</td><td>{{ naam }}</td><td><code>{{ ww }}</code></td></tr>{% endfor %}</table>
+{% for naam, nr, ww in resultaat %}<tr><td>{{ nr or "–" }}</td><td>{{ naam }}</td><td><code>{{ ww }}</code></td></tr>{% endfor %}</table>
 <p><button onclick="window.print()">Afdrukken</button></p></div>
 {% endif %}{% endblock %}
