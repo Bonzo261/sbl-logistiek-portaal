@@ -486,3 +486,35 @@ def test_sessie_vervalt_bij_reset_door_beheerder(client):
     uid = re.findall(r"/beheer/gebruikers/(\d+)/wachtwoord", adm.get("/beheer/gebruikers").get_data(as_text=True))[-1]
     post(adm, f"/beheer/gebruikers/{uid}/wachtwoord", {"nieuw": "nieuwwachtwoord77"}, "/beheer/gebruikers")
     assert co.get("/portaal").status_code == 302  # opnieuw inloggen nodig
+
+
+def test_overzichtsscherm(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "School A", "adres": "Geheimstraat 1", "telefoon": "0611111111", "route_id": "1"}, "/beheer/stembureaus")
+    k = sleutel(c)
+    c.post(f"/api/sms?sleutel={k}", json={"message": "5"})
+    d = c.get("/scherm/data.json").get_json()
+    assert [n["nr"] for n in d["nieuw"]] == [5] and len(d["routes"]) == 2 and d["klaar_vandaag"] == 0
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    d = c.get("/scherm/data.json").get_json()
+    assert d["nieuw"] == [] and d["routes"][0]["open"][0]["nr"] == 5 and d["routes"][0]["niveau"] == "groen"
+    # zonder login en zonder sleutel: geen toegang
+    anon = c.application.test_client()
+    assert anon.get("/scherm/data.json").status_code == 403
+    assert anon.get("/scherm").status_code == 302
+    # met geheime sleutel: toegang, maar zonder adres en telefoon
+    post(c, "/beheer/scherm", {"actie": "nieuw", "drempel": "10"}, "/beheer")
+    sl = re.search(r"scherm\?sleutel=([\w-]+)", c.get("/beheer").get_data(as_text=True)).group(1)
+    r = anon.get(f"/scherm/data.json?sleutel={sl}")
+    assert r.status_code == 200 and "Geheimstraat" not in r.get_data(as_text=True) and "0611111111" not in r.get_data(as_text=True)
+    assert anon.get("/scherm/data.json?sleutel=fout").status_code == 403
+    assert anon.get(f"/scherm?sleutel={sl}").status_code == 200
+    post(c, "/beheer/scherm", {"actie": "uit"}, "/beheer")
+    assert anon.get(f"/scherm/data.json?sleutel={sl}").status_code == 403
+    # chauffeurs hebben geen toegang
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "ch", "wachtwoord": "chauffeur1234", "rol": "chauffeur", "route_id": "1"}, "/beheer/gebruikers")
+    ch = c.application.test_client()
+    post(ch, "/login", {"naam": "ch", "wachtwoord": "chauffeur1234"})
+    assert ch.get("/scherm/data.json").status_code == 403

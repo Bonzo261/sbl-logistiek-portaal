@@ -10,6 +10,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 - Portaal voor coördinator/beheerder: *Nieuw → Onderweg → Klaar*, route-advies accepteren of een andere route kiezen
 - Routepagina per chauffeur met knoppen **Bel voorzitter** en **Navigeer**; pagina's verversen zichzelf
 - Bon afdrukken via de browser (80 mm)
+- Overzichtsscherm voor een grote monitor (`/scherm`): per route het aantal open opdrachten met kleur op wachttijd, wachtende berichten zonder route, klaar vandaag en storingsmelding; ververst zichzelf. Ingelogd, of zonder login via een geheime link die alleen nummers, namen en wachttijden toont
 
 **Beheer**
 - Aantal routes instellen; stembureaus handmatig beheren of importeren uit `.csv`, `.xlsx` of `.ods` (slepen-en-neerzetten, met voorbeeld vóór het opslaan)
@@ -89,7 +90,7 @@ python -m pytest
 De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom via pull requests; voeg een test toe en noteer de wijziging in `CHANGELOG.md`.
 
 ## Roadmap
-Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, overzichtsscherm, Postgres.
+Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, Postgres.
 
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.

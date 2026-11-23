@@ -1,0 +1,42 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SBL Overzicht</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:18px/1.3 system-ui,sans-serif;background:#0b1220;color:#e5e7eb}
+header{display:flex;align-items:center;gap:1.5rem;padding:.8rem 1.5rem;background:#111a2e}
+header h1{margin:0;font-size:1.6rem;flex:1}.klok{font-size:2.2rem;font-weight:700}.tot{font-size:1.2rem;color:#9ca3af}
+.storing{background:#dc2626;color:#fff;padding:.7rem 1.5rem;font-size:1.4rem;font-weight:700;display:none}
+.nieuw{margin:1rem 1.5rem;padding:1rem 1.5rem;border-radius:14px;background:#1f2937;font-size:1.4rem}
+.nieuw.oranje{background:#b45309}.nieuw.rood{background:#b91c1c;animation:knip 1.2s infinite}
+@keyframes knip{50%{opacity:.65}}
+.raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.8rem;padding:0 1.5rem 1.5rem}
+.kaart{border-radius:14px;padding:.8rem 1rem;min-height:120px;background:#1f2937}
+.kaart .nr{font-size:1.1rem;color:#cbd5e1}.kaart .n{font-size:3.2rem;font-weight:800;line-height:1}
+.kaart .min{font-size:1rem;color:#e5e7eb}.kaart ul{margin:.4rem 0 0;padding:0;list-style:none;font-size:.95rem}
+.kaart.leeg{opacity:.55}.kaart.groen{background:#14532d}.kaart.oranje{background:#b45309}.kaart.rood{background:#b91c1c}
+button{position:fixed;right:10px;bottom:10px;opacity:.4;padding:.4rem .8rem;border:0;border-radius:8px}
+</style></head><body>
+<header><h1>SBL Portaal – overzicht</h1><div class="tot" id="tot"></div><div class="klok" id="klok">--:--</div></header>
+<div class="storing" id="storing">⚠ STORING – de sms-gateway meldt zich niet</div>
+<div class="nieuw" id="nieuw"></div>
+<div class="raster" id="raster"></div>
+<button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">Volledig scherm</button>
+<script>
+var SLEUTEL={{ sleutel|tojson }};
+function esc(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;}
+function ververs(){
+ fetch('{{ url_for("scherm_data") }}'+(SLEUTEL?'?sleutel='+encodeURIComponent(SLEUTEL):''),{cache:'no-store'})
+ .then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
+  document.getElementById('klok').textContent=d.tijd;
+  document.getElementById('tot').textContent='Klaar vandaag: '+d.klaar_vandaag;
+  document.getElementById('storing').style.display=d.storing?'block':'none';
+  var n=document.getElementById('nieuw');n.className='nieuw '+d.wachtend_nieuw_niveau;
+  n.innerHTML=d.nieuw.length?('<strong>Wacht op routekeuze: '+d.nieuw.length+'</strong> – '+d.nieuw.map(function(i){return esc(i.nr||'?')+' ('+i.min+' min)';}).join(', ')):'Geen berichten die op een route wachten ✔';
+  document.getElementById('raster').innerHTML=d.routes.map(function(r){
+   var lijst=r.open.slice(0,4).map(function(i){return '<li>'+esc(i.nr)+' '+esc(i.naam)+' · '+i.min+' min</li>';}).join('');
+   return '<div class="kaart '+r.niveau+'"><div class="nr">Route '+r.nummer+'</div><div class="n">'+r.open.length+'</div>'+
+    (r.open.length?'<div class="min">langste wacht '+r.langste+' min</div><ul>'+lijst+(r.open.length>4?'<li>+ '+(r.open.length-4)+' meer</li>':'')+'</ul>':'<div class="min">geen opdrachten</div>')+'</div>';
+  }).join('');
+ }).catch(function(){document.getElementById('klok').textContent='⚠';});
+}
+ververs();setInterval(ververs,10000);
+</script></body></html>
