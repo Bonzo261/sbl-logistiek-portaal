@@ -1,0 +1,7 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Kies een eigen wachtwoord</h1>
+<form method="post" action="{{ url_for('wachtwoord_wijzigen') }}" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<p>Je hebt een tijdelijk wachtwoord gekregen. Kies nu een eigen wachtwoord om verder te gaan.</p>
+<p><input type="password" name="huidig" placeholder="Tijdelijk wachtwoord" autocomplete="current-password" required></p>
+<p><input type="password" name="nieuw" placeholder="Nieuw (min. 10 tekens)" minlength="10" autocomplete="new-password" required></p>
+<p><input type="password" name="nieuw2" placeholder="Nieuw nogmaals" minlength="10" autocomplete="new-password" required></p>
+<button>Opslaan</button></form>{% endblock %}

@@ -13,6 +13,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant). Geen Home Assist
 - Bon afdrukken via de browser (80 mm)
 - Tweestapsverificatie (TOTP, authenticator-app) — verplicht voor beheerder en coördinator (uitzetten: `SBL_2FA_VERPLICHT=0`)
 - Herstelcodes voor 2FA (8 stuks, eenmalig), wachtwoord wijzigen, wachtwoord-reset door beheerder
+- Bulk chauffeursaccounts per route (route1, route2…) met tijdelijk wachtwoord; wijzigen verplicht bij eerste login
 - Back-up downloaden en herstellen vanuit *Beheer → Back-up*
 - Inlogbeveiliging: blokkade na 10 mislukte pogingen
 - Storingsmelding bovenaan het scherm en als push via een meldings-URL (bijv. [ntfy](https://ntfy.sh): maak een geheime topic aan, installeer de ntfy-app en vul de URL in onder *Beheer*)
