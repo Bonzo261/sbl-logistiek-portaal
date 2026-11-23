@@ -14,7 +14,11 @@
  {% else %}
   <form method="post" action="{{ url_for('tweefa_start') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button>Instellen</button></form>
  {% endif %}
-{% endif %}</div><div class="kaart"><h2>Wachtwoord wijzigen</h2>
+{% endif %}</div><div class="kaart"><h2>E-mailadres</h2>
+<p class="klein">Wordt gebruikt voor accountherstel en meldingen over je account.</p>
+<form method="post" action="{{ url_for('account_email') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input type="email" name="email" value="{{ gebruiker.email }}" placeholder="naam@voorbeeld.nl" maxlength="120"><button>Opslaan</button></form></div>
+<div class="kaart"><h2>Wachtwoord wijzigen</h2>
 <form method="post" action="{{ url_for('wachtwoord_wijzigen') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <p><input type="password" name="huidig" placeholder="Huidig wachtwoord" autocomplete="current-password" required></p>
 <p><input type="password" name="nieuw" placeholder="Nieuw (min. 10 tekens)" minlength="10" autocomplete="new-password" required></p>
