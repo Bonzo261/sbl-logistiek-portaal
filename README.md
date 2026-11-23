@@ -8,7 +8,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 **Werkproces**
 - Sms-ontvangst via webhook (`/api/sms`); stembureau, adres, voorzitter en route-advies worden automatisch opgezocht
 - Portaal voor coördinator/beheerder: *Nieuw → Onderweg → Klaar*, route-advies accepteren of een andere route kiezen
-- Optioneel (*Beheer → Werkwijze*): de chauffeur moet een toegewezen stembureau eerst accepteren; zolang dat niet gebeurd is kan de coördinator het naar een andere route verplaatsen
+- Optioneel (*Beheer → Werkwijze*): de chauffeur moet een toegewezen stembureau eerst accepteren; zolang dat niet gebeurd is kan de coördinator het naar een andere route verplaatsen; een instelbare waarschuwing (oranje/rood) vlagt opdrachten die te lang niet geaccepteerd zijn
 - Routepagina per chauffeur met knoppen **Bel voorzitter** en **Navigeer**; pagina's verversen zichzelf
 - Bon afdrukken via de browser (80 mm)
 - Overzichtsscherm voor een grote monitor (`/scherm`): per route het aantal open opdrachten met kleur op wachttijd, wachtende berichten zonder route, klaar vandaag en storingsmelding; ververst zichzelf. Ingelogd, of zonder login via een geheime link die alleen nummers, namen en wachttijden toont

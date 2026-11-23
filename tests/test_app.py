@@ -574,3 +574,30 @@ def test_acceptatie_door_chauffeur_en_verplaatsen(client):
     post(c, "/bericht/3/route", {"route_id": "1"}, "/portaal")
     post(c, "/beheer/werkwijze", {}, "/beheer")
     assert "Bel voorzitter" in ch1.get("/route/1").get_data(as_text=True)
+
+
+def test_waarschuwing_niet_geaccepteerd(client):
+    import sqlite3
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "1"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "A", "adres": "x", "telefoon": "061", "route_id": "1"}, "/beheer/stembureaus")
+    post(c, "/beheer/werkwijze", {"accepteren_verplicht": "1", "accepteer_drempel": "5"}, "/beheer")
+    c.post(f"/api/sms?sleutel={sleutel(c)}", json={"message": "5"})
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    assert "Nog niet geaccepteerd" not in c.get("/portaal").get_data(as_text=True)
+    assert c.get("/scherm/data.json").get_json()["routes"][0]["niveau"] == "groen"
+
+    def oud_maken(minuten):
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        t = (datetime.now(ZoneInfo("Europe/Amsterdam")) - timedelta(minutes=minuten)).strftime("%Y-%m-%d %H:%M:%S")
+        with sqlite3.connect(c.application.config["DATABASE"]) as d:
+            d.execute("UPDATE bericht SET onderweg_op=? WHERE id=1", (t,))
+    oud_maken(6)
+    assert "Nog niet geaccepteerd na 6 min" in c.get("/portaal").get_data(as_text=True)
+    assert c.get("/scherm/data.json").get_json()["routes"][0]["niveau"] == "oranje"
+    oud_maken(11)
+    assert c.get("/scherm/data.json").get_json()["routes"][0]["niveau"] == "rood"
+    post(c, "/bericht/1/accepteer", tokenurl="/portaal")
+    assert "Nog niet geaccepteerd" not in c.get("/portaal").get_data(as_text=True)

@@ -472,7 +472,12 @@ def create_app(config=None):
                                WHERE b.status!='klaar' ORDER BY b.ontvangen""").fetchall()
         nieuw = [r for r in rows if r["status"] == "nieuw"]
         onderweg = [r for r in rows if r["status"] == "onderweg"]
-        toegewezen = [r for r in rows if r["status"] == "toegewezen"]
+        drempel_acc = max(1, int(instelling("accepteer_drempel", "5")))
+        toegewezen = []
+        for r in rows:
+            if r["status"] == "toegewezen":
+                m = minuten_sinds(r["onderweg_op"])
+                toegewezen.append(dict(r, min=m, niveau="rood" if m >= 2 * drempel_acc else "oranje" if m >= drempel_acc else ""))
         klaar = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, r.nummer AS route_nummer
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                 LEFT JOIN route r ON r.id=b.route_id
@@ -578,7 +583,7 @@ def create_app(config=None):
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
-                               accepteren=instelling("accepteren_verplicht", "0") == "1",
+                               accepteren=instelling("accepteren_verplicht", "0") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
                                scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
     @app.post("/beheer/routes")
@@ -1054,6 +1059,7 @@ def create_app(config=None):
 
     def scherm_gegevens():
         drempel = max(1, int(instelling("scherm_drempel", "15")))
+        drempel_acc = max(1, int(instelling("accepteer_drempel", "5")))
         nieuw = [{"nr": r["nummer"], "naam": r["naam"] or "onbekend bericht", "min": minuten_sinds(r["ontvangen"])}
                  for r in db().execute("""SELECT b.ontvangen, s.nummer, s.naam FROM bericht b
                                           LEFT JOIN stembureau s ON s.id=b.stembureau_id
@@ -1070,6 +1076,11 @@ def create_app(config=None):
             items = per_route.get(r["id"], [])
             langste = max([i["min"] for i in items], default=0)
             niveau = "leeg" if not items else ("rood" if langste >= 2 * drempel else "oranje" if langste >= drempel else "groen")
+            wacht_min = max([i["min"] for i in items if i["wacht"]], default=0)
+            if wacht_min >= 2 * drempel_acc:
+                niveau = "rood"
+            elif wacht_min >= drempel_acc and niveau != "rood":
+                niveau = "oranje"
             routes_uit.append({"nummer": r["nummer"], "open": items, "langste": langste, "niveau": niveau})
         vandaag = nu(app)[:10]
         klaar = db().execute("SELECT COUNT(*) c FROM bericht WHERE status='klaar' AND substr(klaar_op,1,10)=?", (vandaag,)).fetchone()["c"]
@@ -1096,6 +1107,9 @@ def create_app(config=None):
     def beheer_werkwijze():
         aan = "1" if request.form.get("accepteren_verplicht") else "0"
         zet_instelling("accepteren_verplicht", aan)
+        d = request.form.get("accepteer_drempel", type=int)
+        if d and 1 <= d <= 120:
+            zet_instelling("accepteer_drempel", d)
         if aan == "0":  # openstaande opdrachten die nog op acceptatie wachten gaan gewoon door
             db().execute("UPDATE bericht SET status='onderweg' WHERE status='toegewezen'")
         audit(f"acceptatie door chauffeur {'aan' if aan == '1' else 'uit'}")

@@ -16,8 +16,9 @@
   <input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Verwijderen</button></form>
 </div>{% else %}<p class="klein">Geen nieuwe berichten.</p>{% endfor %}
 {% if toegewezen %}<h2>Wacht op acceptatie ({{ toegewezen|length }})</h2>
-{% for b in toegewezen %}<div class="kaart">
- <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }} <span class="klein">· toegewezen {{ b.onderweg_op[11:16] }}</span><br><span class="klein">{{ b.adres }}</span>
+{% for b in toegewezen %}<div class="kaart" {% if b.niveau == 'rood' %}style="border:3px solid #dc2626;background:#fee2e2"{% elif b.niveau == 'oranje' %}style="border:3px solid #f59e0b;background:#fef3c7"{% endif %}>
+ {% if b.niveau %}<strong style="color:{{ '#b91c1c' if b.niveau == 'rood' else '#b45309' }}">⚠ Nog niet geaccepteerd na {{ b.min }} min – bel de chauffeur of verplaats de opdracht</strong><br>{% endif %}
+ <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }} <span class="klein">· toegewezen {{ b.onderweg_op[11:16] }} ({{ b.min }} min geleden)</span><br><span class="klein">{{ b.adres }}</span>
  <form method="post" action="{{ url_for('bericht_route', bid=b.id) }}" class="rij">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <select name="route_id">{% for r in routes %}<option value="{{ r.id }}" {% if r.id == b.route_id %}selected{% endif %}>Route {{ r.nummer }}</option>{% endfor %}</select>
