@@ -101,6 +101,10 @@ De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.
 ## Roadmap
 Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, Postgres.
 
+Wensen:
+- Rijvolgorde van de opdrachten op een route: de chauffeur kan zelf herordenen en/of de coördinator bepaalt de volgorde (nu staan opdrachten op volgorde van acceptatie).
+- Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).
+
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.
 
