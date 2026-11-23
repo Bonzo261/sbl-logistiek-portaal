@@ -652,3 +652,27 @@ def test_chauffeur_melding_status_en_instelling(client):
     assert d["nieuwste"] == 1 and d["geluid"] is True
     assert "geluid.js" in c.get("/scherm").get_data(as_text=True)
     assert c.get("/static/geluid.js").status_code == 200
+
+
+def test_oude_route_krijgt_melding_bij_verplaatsen(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "School A", "adres": "x", "telefoon": "061", "route_id": "1"}, "/beheer/stembureaus")
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "ch1", "wachtwoord": "chauffeur1234", "rol": "chauffeur", "route_id": "1"}, "/beheer/gebruikers")
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "ch2", "wachtwoord": "chauffeur5678", "rol": "chauffeur", "route_id": "2"}, "/beheer/gebruikers")
+    ch1, ch2 = c.application.test_client(), c.application.test_client()
+    post(ch1, "/login", {"naam": "ch1", "wachtwoord": "chauffeur1234"})
+    post(ch2, "/login", {"naam": "ch2", "wachtwoord": "chauffeur5678"})
+    post(c, "/beheer/werkwijze", {"accepteren_verplicht": "1", "melding_chauffeur": "1", "geluid_nieuw": "1"}, "/beheer")
+    c.post(f"/api/sms?sleutel={sleutel(c)}", json={"message": "5"})
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    assert ch1.get("/route/1/status.json").get_json()["meldingen"] == []  # eerste toewijzing: geen verplaatsmelding
+    post(c, "/bericht/1/route", {"route_id": "2"}, "/portaal")
+    m = ch1.get("/route/1/status.json?na=0").get_json()["meldingen"]
+    assert len(m) == 1 and "Stembureau 5 – School A" in m[0]["tekst"] and "route 2" in m[0]["tekst"]
+    assert ch1.get(f"/route/1/status.json?na={m[0]['id']}").get_json()["meldingen"] == []  # maar één keer
+    assert ch2.get("/route/2/status.json").get_json()["meldingen"] == []  # nieuwe route krijgt gewone opdracht-melding
+    assert ch2.get("/route/2/status.json").get_json()["items"][0]["nr"] == 5
+    # pagina begint na de laatste melding, zodat oude meldingen niet opnieuw getoond worden
+    assert f"laatsteMelding={m[0]['id']}" in ch1.get("/route/1").get_data(as_text=True).replace(" ", "")
