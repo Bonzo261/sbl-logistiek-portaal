@@ -1,51 +1,91 @@
 # SBL Logistiek Portaal
 
-Webapp voor de logistiek rond stembureaus (Stembureau-Bezorg-Logistiek): een voorzitter stuurt een sms met alleen het stembureaunummer, de coördinator ziet de melding met adres en telefoonnummer, kiest de (geadviseerde) route, de chauffeur van die route ziet de opdracht, belt de voorzitter en vinkt af.
+Webapp voor de logistiek rond stembureaus. Een voorzitter stuurt een sms met alleen het stembureaunummer. De coördinator ziet de melding met adres en telefoonnummer en kiest de (geadviseerde) route. De chauffeur van die route ziet de opdracht, belt de voorzitter en vinkt af.
 
-Elke gemeente draait een eigen installatie (geen multi-tenant). Geen Home Assistant nodig.
+Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen server, ook in de cloud. De beheerder van de installatie is zelf verantwoordelijk voor beheer, updates en back-ups.
 
 ## Functies
-- Rollen: **beheerder**, **coördinator**, **chauffeur** (gekoppeld aan één route)
-- Sms-ontvangst via webhook (`/api/sms`), gateway-heartbeat (`/api/heartbeat`) met storingsmelding
-- Portaal: Nieuw → Onderweg → Klaar, route-advies per stembureau of andere route kiezen
-- Routepagina per chauffeur met bel- en navigatieknop
-- Beheer: aantal routes instellen, stembureaus invoeren of importeren (CSV/Excel met voorbeeld), gebruikers, logboek
+**Werkproces**
+- Sms-ontvangst via webhook (`/api/sms`); stembureau, adres, voorzitter en route-advies worden automatisch opgezocht
+- Portaal voor coördinator/beheerder: *Nieuw → Onderweg → Klaar*, route-advies accepteren of een andere route kiezen
+- Routepagina per chauffeur met knoppen **Bel voorzitter** en **Navigeer**; pagina's verversen zichzelf
 - Bon afdrukken via de browser (80 mm)
-- Tweestapsverificatie (TOTP, authenticator-app) — verplicht voor beheerder en coördinator (uitzetten: `SBL_2FA_VERPLICHT=0`)
-- Herstelcodes voor 2FA (8 stuks, eenmalig), wachtwoord wijzigen, wachtwoord-reset door beheerder
-- Bulk chauffeursaccounts per route (route1, route2…) met tijdelijk wachtwoord; wijzigen verplicht bij eerste login
-- Back-up downloaden en herstellen vanuit *Beheer → Back-up*
-- Inlogbeveiliging: blokkade na 10 mislukte pogingen
-- Storingsmelding bovenaan het scherm en als push via een meldings-URL (bijv. [ntfy](https://ntfy.sh): maak een geheime topic aan, installeer de ntfy-app en vul de URL in onder *Beheer*)
 
-## Starten
+**Beheer**
+- Aantal routes instellen; stembureaus handmatig beheren of importeren uit `.csv`, `.xlsx` of `.ods` (slepen-en-neerzetten, met voorbeeld vóór het opslaan)
+- Gebruikers beheren, ook in bulk: één chauffeursaccount per route (`route1`, `route2`, …) met een tijdelijk wachtwoord dat bij de eerste login gewijzigd moet worden
+- Back-up downloaden en herstellen (*Beheer → Back-up*)
+- Logboek van acties
+
+**Bewaking en beveiliging**
+- Gateway-heartbeat (`/api/heartbeat`) met storingsmelding bovenaan het scherm en als push via een meldings-URL (bijv. [ntfy](https://ntfy.sh))
+- Rollen: **beheerder**, **coördinator**, **chauffeur** (gekoppeld aan één route)
+- Tweestapsverificatie (TOTP, met QR-code) is verplicht voor beheerder en coördinator; 8 eenmalige herstelcodes
+- Blokkade na 10 mislukte inlogpogingen in 15 minuten, CSRF-bescherming, beveiligde cookies
+- Wachtwoord wijzigen door gebruiker zelf; reset door beheerder
+
+## Installatie
+### Docker (aanbevolen)
 ```
 docker compose up -d --build
 ```
-Open `http://localhost:8000`, maak het eerste beheerdersaccount aan en stel onder *Beheer* het aantal routes in en importeer de stembureaus. De sms-webhook-URL staat onder *Beheer*.
+of met de kant-en-klare image (zie *Docker-image*):
+```
+docker run -d --name sbl --restart unless-stopped -p 8000:8000 \
+  -v sbl-data:/data -e SBL_HTTPS=1 -e SBL_PROXY=1 <gebruiker>/sbl-logistiek-portaal:latest
+```
+Open de site, maak het eerste beheerdersaccount aan (minimaal 10 tekens wachtwoord) en stel 2FA in. Stel daarna onder *Beheer* het aantal routes in en importeer de stembureaus. De sms- en heartbeat-URL's staan ook onder *Beheer*.
 
-Zonder Docker: `pip install -r requirements.txt && gunicorn -b 0.0.0.0:8000 wsgi:app` (of `flask --app wsgi run` om te ontwikkelen).
+### Zonder Docker
+```
+pip install -r requirements.txt
+gunicorn -b 127.0.0.1:8000 -w 2 wsgi:app
+```
+Om te ontwikkelen: `flask --app wsgi run`.
 
-**Achter een reverse proxy:** zet `SBL_PROXY=1` zodat het echte IP-adres (voor de inlogblokkade) en `https` worden herkend. Zet dit alleen aan als de app niet rechtstreeks bereikbaar is.
+### Productie
+- Zet de app achter een reverse proxy met **HTTPS** (Caddy, nginx of Apache/Plesk) en zet `SBL_HTTPS=1` en `SBL_PROXY=1`. Zet `SBL_PROXY` alleen aan als de app niet rechtstreeks bereikbaar is; laat poort 8000 bij voorkeur alleen op `127.0.0.1` luisteren.
+- Apache-voorbeeld (extra richtlijnen voor HTTPS):
+  ```
+  ProxyPreserveHost On
+  ProxyRequests Off
+  RequestHeader set X-Forwarded-Proto "https"
+  ProxyPass /.well-known !
+  ProxyPass / http://127.0.0.1:8000/
+  ProxyPassReverse / http://127.0.0.1:8000/
+  ```
+- Bewaar de data in een volume (`/data`) en maak regelmatig een back-up (*Beheer → Back-up*). Een back-up bevat wachtwoord-hashes en 2FA-sleutels: bewaar hem veilig.
+- Bijwerken: haal de nieuwste image op en maak de container opnieuw aan; het volume blijft behouden. Zie `CHANGELOG.md` voor wijzigingen.
 
-**Productie:** zet de app achter een reverse proxy met HTTPS (bijv. Caddy of nginx) en maak regelmatig een back-up van `data/sbl.db`. De beheerder van de installatie is zelf verantwoordelijk voor beheer, updates en back-ups.
+### Instellingen (omgevingsvariabelen)
+| Variabele | Standaard | Betekenis |
+|---|---|---|
+| `SBL_DATABASE` | `sbl.db` (in Docker: `/data/sbl.db`) | Pad naar de SQLite-database |
+| `SBL_HTTPS` | `0` | `1` = cookies alleen via HTTPS (zet aan in productie) |
+| `SBL_PROXY` | `0` | `1` = vertrouw `X-Forwarded-*`-headers van een reverse proxy |
+| `SBL_2FA_VERPLICHT` | `1` | `0` = 2FA niet verplicht voor beheerder/coördinator |
+| `SBL_TIJDZONE` | `Europe/Amsterdam` | Tijdzone voor tijden en bewaking |
+| `SBL_SECRET_KEY` | automatisch | Sleutel voor sessies; standaard gegenereerd en in de database bewaard |
+| `SBL_BEWAKING` | `1` | `0` = achtergrondbewaking van de gateway uitzetten |
+
+## Sms-forwarder koppelen
+Stel in de forwarder een **POST**-webhook in naar de URL onder *Beheer* (`/api/sms?sleutel=…`). De tekst mag in het veld `message`, `text`, `body`, `tekst` of `content` staan, als formulier of JSON; alleen het stembureaunummer is nodig. Voor de bewaking: laat de forwarder regelmatig (GET of POST) `/api/heartbeat?sleutel=…` aanroepen. Na de ingestelde tijd zonder ping (standaard 600 seconden) volgt een storingsmelding. Vul een meldings-URL in (bijv. een geheime ntfy-topic) voor een push naar de telefoon. De sleutel kun je onder *Beheer* vernieuwen.
 
 ## Import
-Kolommen (kopregel verplicht): `nummer`, `naam` of `locatie`, `adres` (of `straat`/`huisnummer`/`toevoeging`/`postcode`/`plaats`), `telefoon`, `route`.
+Kopregel verplicht. Herkende kolommen: `nummer` (of `sbNummers`), `naam` (of `locatie`), `adres` (of `straat`/`huisnummer`/`toevoeging`/`postcode`/`plaats`), `telefoon`, `route`. Een weggevallen voorloopnul in een telefoonnummer wordt hersteld. Bestaande stembureaus worden bijgewerkt; optioneel kun je eerst alles wissen.
+
+## Docker-image
+Bij elke wijziging op `main` draaien de tests en bouwt GitHub een image voor Docker Hub (`<gebruiker>/sbl-logistiek-portaal:latest`, `amd64` en `arm64`). Dit vereist de repository-secrets `DOCKERHUB_USERNAME` en `DOCKERHUB_TOKEN`.
 
 ## Ontwikkelen
 ```
 pip install -r requirements-dev.txt
 python -m pytest
 ```
-Bijdragen zijn welkom via pull requests.
+De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom via pull requests; voeg een test toe en noteer de wijziging in `CHANGELOG.md`.
 
 ## Roadmap
-Automatisch printen (kiosk),  optionele Epson ePOS-printer, Postgres, historie per verkiezing.
+Automatisch printen (kiosk), optionele Epson ePOS-printer, dagelijkse automatische back-up, historie per verkiezing, overzichtsscherm, Postgres.
 
 ## Licentie
-GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige licentietekst staat in het bestand `LICENSE`.
-
-## Docker-image (Docker Hub)
-Bij elke wijziging op `main` bouwt GitHub automatisch een image en zet die op Docker Hub (`<gebruiker>/sbl-logistiek-portaal:latest`). Vereist de repository-secrets `DOCKERHUB_USERNAME` en `DOCKERHUB_TOKEN`.
-Draaien: `docker run -d -p 8000:8000 -v sbl-data:/data -e SBL_HTTPS=1 <gebruiker>/sbl-logistiek-portaal:latest`
+GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.
