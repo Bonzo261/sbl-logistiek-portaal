@@ -1,9 +1,21 @@
 {% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p><h1>Back-up en herstel</h1>
+<div class="kaart"><h2>Automatische back-up</h2>
+<p class="klein">Elke nacht (vanaf 03:00) wordt een kopie van alle gegevens bewaard in de map <code>{{ map }}</code> op de server (in Docker: in het volume). Laatste back-up: <strong>{{ laatste or 'nog geen' }}</strong>.
+{% if fout %}<br><strong style="color:#dc2626">De laatste poging is mislukt: {{ fout }}</strong>{% endif %}</p>
+<p class="storing" style="background:#92400e">Een back-up op dezelfde server beschermt niet bij het verlies van die server. Download daarom af en toe een kopie en bewaar die ergens anders.</p>
+<form method="post" action="{{ url_for('backup_instellingen') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<label><input type="checkbox" name="auto" value="1" {% if auto %}checked{% endif %}> automatisch dagelijks</label>
+<label>bewaar de laatste <input type="number" name="bewaar" min="1" max="365" value="{{ bewaar }}" style="width:5rem"> back-ups</label><button>Opslaan</button></form>
+<form method="post" action="{{ url_for('backup_nu') }}" style="margin-top:.6rem"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Nu een back-up maken op de server</button></form>
+{% if lijst %}<table style="margin-top:.8rem"><tr><th>Bestand</th><th>Tijd</th><th>Grootte</th><th></th><th></th></tr>
+{% for b in lijst %}<tr><td><code>{{ b.naam }}</code></td><td>{{ b.tijd }}</td><td>{{ (b.grootte / 1024)|round(0)|int }} kB</td>
+<td><form method="post" action="{{ url_for('backup_bestand_download', naam=b.naam) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Download</button></form></td>
+<td><form method="post" action="{{ url_for('backup_herstel') }}" class="rij" onsubmit="return confirm('Alle huidige gegevens vervangen door deze back-up?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="opgeslagen" value="{{ b.naam }}"><input name="bevestig" placeholder="Typ HERSTEL" style="width:8rem" required><button class="rood">Herstel</button></form></td></tr>{% endfor %}</table>{% endif %}</div>
 <div class="kaart"><h2>Back-up downloaden</h2>
-<p class="klein">Alle gegevens in één bestand: stembureaus, routes, berichten, gebruikers (met wachtwoord-hashes en 2FA-sleutels) en instellingen. Bewaar het bestand veilig; wie het heeft, heeft toegang tot de gegevens.</p>
+<p class="klein">Alle gegevens in één bestand: stembureaus, routes, berichten, gebruikers (met wachtwoord-hashes en 2FA-sleutels) en instellingen, inclusief een eventueel SMTP-wachtwoord. Bewaar het bestand veilig; wie het heeft, heeft toegang tot de gegevens.</p>
 <form method="post" action="{{ url_for('backup_download') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="groen">Back-up downloaden</button></form></div>
-<div class="kaart"><h2>Herstellen uit een back-up</h2>
-<p class="klein"><strong>Let op:</strong> alle huidige gegevens worden vervangen door de inhoud van de back-up. Je wordt uitgelogd.</p>
+<div class="kaart"><h2>Herstellen uit een gedownload bestand</h2>
+<p class="klein"><strong>Let op:</strong> alle huidige gegevens worden vervangen door de inhoud van de back-up. Alle gebruikers worden uitgelogd.</p>
 <form method="post" action="{{ url_for('backup_herstel') }}" enctype="multipart/form-data" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <input type="file" name="bestand" accept=".db" required><input name="bevestig" placeholder="Typ HERSTEL" required><button class="rood">Herstellen</button></form></div>
 {% endblock %}

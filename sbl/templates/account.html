@@ -23,4 +23,6 @@
 <p><input type="password" name="huidig" placeholder="Huidig wachtwoord" autocomplete="current-password" required></p>
 <p><input type="password" name="nieuw" placeholder="Nieuw (min. 10 tekens)" minlength="10" autocomplete="new-password" required></p>
 <p><input type="password" name="nieuw2" placeholder="Nieuw nogmaals" minlength="10" autocomplete="new-password" required></p>
-<button>Wijzigen</button></form></div>{% endblock %}
+<button>Wijzigen</button></form>
+<form method="post" action="{{ url_for('uitloggen_elders') }}" style="margin-top:.8rem"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<button class="grijs">Uitloggen op alle andere apparaten</button></form></div>{% endblock %}

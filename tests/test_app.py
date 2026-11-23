@@ -413,3 +413,76 @@ def test_testmail_en_fouten(client, monkeypatch):
     # wachtwoord blijft behouden als het veld leeg is
     post(c, "/beheer/mail", dict(MAILFORM, wachtwoord=""), "/beheer")
     assert "ingesteld – leeg laten" in c.get("/beheer").get_data(as_text=True)
+
+
+def test_automatische_backup_bewaren_en_herstellen(client):
+    import os
+    import sqlite3
+    c = client
+    maak_admin(c)
+    app = c.application
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "7", "naam": "Eerste", "adres": "x", "telefoon": "061", "route_id": ""}, "/beheer/stembureaus")
+    naam = app.auto_backup(forceer=True)
+    assert naam and re.fullmatch(r"sbl-auto-\d{8}-\d{6}\.db", naam)
+    assert app.auto_backup() is None  # niet nogmaals op dezelfde dag
+    mapje = os.path.join(os.path.dirname(app.config["DATABASE"]), "backups")
+    assert oct(os.stat(os.path.join(mapje, naam)).st_mode)[-3:] == "600"
+    with sqlite3.connect(os.path.join(mapje, naam)) as d:
+        assert d.execute("SELECT naam FROM stembureau").fetchone()[0] == "Eerste"
+    assert naam in c.get("/beheer/backup").get_data(as_text=True)
+    # retentie: oude bestanden worden opgeruimd
+    post(c, "/beheer/backup/instellingen", {"auto": "1", "bewaar": "2"}, "/beheer/backup")
+    for oud in ("20200101-000000", "20200102-000000", "20200103-000000"):
+        open(os.path.join(mapje, f"sbl-auto-{oud}.db"), "wb").close()
+    app.auto_backup(forceer=True)
+    over = sorted(os.listdir(mapje))
+    assert len(over) == 2 and "sbl-auto-20200101-000000.db" not in over
+    # wijzig gegevens en herstel vanaf de opgeslagen back-up
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "8", "naam": "Tweede", "adres": "y", "telefoon": "062", "route_id": ""}, "/beheer/stembureaus")
+    nieuwste = [n for n in over if not n.startswith("sbl-auto-2020")][-1]
+    # alleen een back-up waar 'Tweede' nog niet in zit: de eerste
+    post(c, "/beheer/backup/herstel", {"opgeslagen": naam, "bevestig": "HERSTEL"}, "/beheer/backup")
+    assert c.get("/beheer").status_code == 302  # alle sessies vervallen
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    pagina = c.get("/beheer/stembureaus").get_data(as_text=True)
+    assert "Eerste" in pagina and "Tweede" not in pagina
+
+
+def test_backupbestand_download_beveiligd(client):
+    c = client
+    maak_admin(c)
+    naam = c.application.auto_backup(forceer=True)
+    assert post(c, f"/beheer/backup/bestand/{naam}", tokenurl="/beheer/backup").data[:15] == b"SQLite format 3"
+    assert post(c, "/beheer/backup/bestand/..%2Fsbl.db", tokenurl="/beheer/backup").status_code == 404
+    assert post(c, "/beheer/backup/bestand/passwd", tokenurl="/beheer/backup").status_code == 404
+
+
+def test_sessies_vervallen_bij_wachtwoordwijziging(client):
+    c1 = client
+    maak_admin(c1)
+    c2 = c1.application.test_client()
+    post(c2, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert c2.get("/beheer").status_code == 200
+    # wachtwoord wijzigen op apparaat 1: apparaat 1 blijft ingelogd, apparaat 2 niet
+    post(c1, "/account/wachtwoord", {"huidig": "langwachtwoord1", "nieuw": "nieuwwachtwoord99", "nieuw2": "nieuwwachtwoord99"}, "/account")
+    assert c1.get("/beheer").status_code == 200
+    assert c2.get("/beheer").status_code == 302
+    # 'uitloggen op andere apparaten'
+    c3 = c1.application.test_client()
+    post(c3, "/login", {"naam": "admin", "wachtwoord": "nieuwwachtwoord99"})
+    assert c3.get("/beheer").status_code == 200
+    post(c1, "/account/uitloggen-elders", tokenurl="/account")
+    assert c1.get("/beheer").status_code == 200 and c3.get("/beheer").status_code == 302
+
+
+def test_sessie_vervalt_bij_reset_door_beheerder(client):
+    adm = client
+    maak_admin(adm)
+    post(adm, "/beheer/gebruikers/nieuw", {"naam": "co", "wachtwoord": "coordinator123", "rol": "coordinator"}, "/beheer/gebruikers")
+    co = adm.application.test_client()
+    post(co, "/login", {"naam": "co", "wachtwoord": "coordinator123"})
+    assert co.get("/portaal").status_code == 200
+    uid = re.findall(r"/beheer/gebruikers/(\d+)/wachtwoord", adm.get("/beheer/gebruikers").get_data(as_text=True))[-1]
+    post(adm, f"/beheer/gebruikers/{uid}/wachtwoord", {"nieuw": "nieuwwachtwoord77"}, "/beheer/gebruikers")
+    assert co.get("/portaal").status_code == 302  # opnieuw inloggen nodig
