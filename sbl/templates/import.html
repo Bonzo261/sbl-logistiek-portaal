@@ -1,8 +1,27 @@
-{% extends "basis.html" %}{% block inhoud %}<h1>Stembureaus importeren</h1>
+{% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p>
+<h1>Stembureaus importeren</h1>
 {% if voorbeeld is none %}
-<form method="post" enctype="multipart/form-data" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
-<p>Kies een .csv-, .xlsx- of .ods-bestand met een kopregel. Herkende kolommen: <em>nummer, naam (of locatie), adres (of straat/huisnummer/toevoeging/postcode/plaats), telefoon, route</em>.</p>
-<input type="file" name="bestand" accept=".csv,.xlsx,.ods" required> <button>Voorbeeld tonen</button></form>
+<form method="post" enctype="multipart/form-data" class="kaart" id="uploadform"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<p>Sleep een .csv-, .xlsx- of .ods-bestand hierheen, of klik om er een te kiezen. Herkende kolommen: <em>nummer (of sbNummers), naam (of locatie), adres (of straat/huisnummer/toevoeging/postcode/plaats), telefoon, route</em>.</p>
+<label id="dropzone" style="display:block;border:3px dashed #9ca3af;border-radius:12px;padding:2.5rem 1rem;text-align:center;cursor:pointer">
+ <span id="droptekst">📄 Sleep het bestand hier naartoe</span>
+ <input type="file" name="bestand" id="bestand" accept=".csv,.xlsx,.ods" required style="display:none">
+</label>
+<p><button id="verstuur">Voorbeeld tonen</button></p></form>
+<script>
+(function(){
+ var dz=document.getElementById('dropzone'),inp=document.getElementById('bestand'),tekst=document.getElementById('droptekst');
+ function toon(){ if(inp.files.length){ tekst.textContent='✅ '+inp.files[0].name; dz.style.borderColor='#16a34a'; } }
+ inp.addEventListener('change',toon);
+ ['dragenter','dragover'].forEach(function(e){dz.addEventListener(e,function(ev){ev.preventDefault();dz.style.background='#e0e7ff';});});
+ ['dragleave','drop'].forEach(function(e){dz.addEventListener(e,function(ev){ev.preventDefault();dz.style.background='';});});
+ dz.addEventListener('drop',function(ev){
+  if(ev.dataTransfer.files.length){ inp.files=ev.dataTransfer.files; toon(); }
+ });
+ // voorkom dat een los neergezet bestand buiten het vak de pagina vervangt
+ ['dragover','drop'].forEach(function(e){window.addEventListener(e,function(ev){ev.preventDefault();});});
+})();
+</script>
 {% else %}
 <div class="kaart"><strong>{{ voorbeeld|length }} stembureaus gevonden</strong> ({{ nieuw }} nieuw, {{ voorbeeld|length - nieuw }} bestaand worden bijgewerkt).</div>
 {% for f in fouten %}<div class="flash">{{ f }}</div>{% endfor %}
