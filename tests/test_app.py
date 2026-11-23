@@ -695,3 +695,14 @@ def test_huisstijl_bestanden(client):
     for f in ("FiraSans-Regular.woff", "FiraSans-Medium.woff", "FiraSans-Bold.woff", "OFL-FiraSans.txt"):
         assert client.get("/static/fonts/" + f).status_code == 200
     assert "stijl.css" in client.get("/login").get_data(as_text=True) and "fonts.css" in client.get("/login").get_data(as_text=True)
+
+
+def test_eigen_webhooksleutel(client):
+    maak_admin(client)
+    t = token(client)
+    post(client, "/beheer/instellingen", {"csrf": t, "sleutel_modus": "eigen", "eigen_sleutel": "test123"})
+    assert client.post("/api/sms?sleutel=test123", data={"message": "1"}).status_code != 403
+    post(client, "/beheer/instellingen", {"csrf": t, "sleutel_modus": "eigen", "eigen_sleutel": "a b!"})
+    assert client.post("/api/sms?sleutel=a b!", data={"message": "1"}).status_code == 403
+    post(client, "/beheer/instellingen", {"csrf": t, "sleutel_modus": "veilig"})
+    assert client.post("/api/sms?sleutel=test123", data={"message": "1"}).status_code == 403
