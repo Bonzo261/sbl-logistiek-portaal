@@ -13,7 +13,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 
 **Beheer**
 - Aantal routes instellen; stembureaus handmatig beheren of importeren uit `.csv`, `.xlsx` of `.ods` (slepen-en-neerzetten, met voorbeeld vóór het opslaan)
-- Gebruikers beheren, ook in bulk: één chauffeursaccount per route (`route1`, `route2`, …) met een tijdelijk wachtwoord dat bij de eerste login gewijzigd moet worden
+- Gebruikers beheren, ook in bulk: één chauffeursaccount per route (`route1`, `route2`, …) met een tijdelijk wachtwoord dat bij de eerste login gewijzigd moet worden; acties op een selectie gebruikers (nieuw tijdelijk wachtwoord, 2FA resetten, route wijzigen, verwijderen)
 - Back-up downloaden en herstellen (*Beheer → Back-up*)
 - Logboek van acties
 
