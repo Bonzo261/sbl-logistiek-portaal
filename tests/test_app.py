@@ -148,3 +148,9 @@ def test_storing_bewaking_meldt_een_keer(tmp_path, monkeypatch):
         c.execute("UPDATE instelling SET value='2999-01-01 00:00:00' WHERE key='laatste_ping'")
     app.bewaak_gateway()
     assert len(verzonden) == 2  # herstel gemeld
+
+
+def test_qr_code():
+    pytest.importorskip("segno")
+    from sbl import totp
+    assert totp.qr_svg("otpauth://totp/x?secret=ABC").startswith("data:image/svg+xml")

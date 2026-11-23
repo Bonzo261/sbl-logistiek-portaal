@@ -36,4 +36,4 @@ python -m pytest
 Bijdragen zijn welkom via pull requests.
 
 ## Roadmap
-Automatisch printen (kiosk), herstelcodes voor 2FA, QR-code bij 2FA-instelling, optionele Epson ePOS-printer, Postgres, historie per verkiezing.
+Automatisch printen (kiosk), herstelcodes voor 2FA,  optionele Epson ePOS-printer, Postgres, historie per verkiezing.
