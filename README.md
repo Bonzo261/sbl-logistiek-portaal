@@ -37,3 +37,6 @@ Bijdragen zijn welkom via pull requests.
 
 ## Roadmap
 Automatisch printen (kiosk), herstelcodes voor 2FA,  optionele Epson ePOS-printer, Postgres, historie per verkiezing.
+
+## Licentie
+GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige licentietekst staat in het bestand `LICENSE`.
