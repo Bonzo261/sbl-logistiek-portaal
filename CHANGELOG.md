@@ -5,6 +5,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 ## [Niet uitgebracht]
 
 ### Toegevoegd
+- "Wachtwoord vergeten" per e-mail via een instelbare SMTP-server (*Beheer → E-mail*, met testmail); herstellink een uur geldig en eenmalig, begrensd aantal aanvragen, 2FA blijft gelden
 - E-mailadres per gebruiker (bij installatie, aanmaken, op de accountpagina en door de beheerder; uniek, kleine letters)
 - Lijst met tijdelijke wachtwoorden downloaden als Excel (route, gebruikersnaam, wachtwoord, inlog-URL)
 - Acties op een selectie gebruikers: nieuw tijdelijk wachtwoord (printbare lijst), wachtwoordwijziging afdwingen, 2FA resetten, route wijzigen en verwijderen

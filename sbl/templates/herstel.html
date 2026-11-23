@@ -1,0 +1,5 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Nieuw wachtwoord kiezen</h1>
+<form method="post" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<p><input type="password" name="nieuw" placeholder="Nieuw (min. 10 tekens)" minlength="10" autocomplete="new-password" required></p>
+<p><input type="password" name="nieuw2" placeholder="Nieuw nogmaals" minlength="10" autocomplete="new-password" required></p>
+<button>Opslaan</button></form>{% endblock %}
