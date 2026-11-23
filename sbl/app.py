@@ -549,7 +549,8 @@ def create_app(config=None):
                                n_sb=db().execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
-                               mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")))
+                               mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
+                               scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
     @app.post("/beheer/routes")
     @rol_vereist("beheerder")
@@ -1005,6 +1006,76 @@ def create_app(config=None):
         session.clear()
         flash("Back-up hersteld. Log opnieuw in.")
         return redirect(url_for("login"))
+
+    # ---------- overzichtsscherm (wand) ----------
+    def scherm_toegang():
+        """Ingelogd als beheerder/coördinator, of met de geheime schermsleutel in de URL."""
+        gb = g.get("gebruiker")
+        if gb and gb["rol"] in ("beheerder", "coordinator"):
+            return True
+        sl = instelling("scherm_sleutel")
+        return bool(sl) and secrets.compare_digest(request.args.get("sleutel", ""), sl)
+
+    def minuten_sinds(tekst):
+        if not tekst:
+            return 0
+        tz = ZoneInfo(app.config["TIJDZONE"])
+        t = datetime.strptime(tekst, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
+        return max(0, int((datetime.now(tz) - t).total_seconds() // 60))
+
+    def scherm_gegevens():
+        drempel = max(1, int(instelling("scherm_drempel", "15")))
+        nieuw = [{"nr": r["nummer"], "naam": r["naam"] or "onbekend bericht", "min": minuten_sinds(r["ontvangen"])}
+                 for r in db().execute("""SELECT b.ontvangen, s.nummer, s.naam FROM bericht b
+                                          LEFT JOIN stembureau s ON s.id=b.stembureau_id
+                                          WHERE b.status='nieuw' ORDER BY b.ontvangen""")]
+        per_route = {}
+        for r in db().execute("""SELECT b.route_id, b.onderweg_op, s.nummer, s.naam FROM bericht b
+                                 LEFT JOIN stembureau s ON s.id=b.stembureau_id
+                                 WHERE b.status='onderweg' ORDER BY b.onderweg_op"""):
+            per_route.setdefault(r["route_id"], []).append(
+                {"nr": r["nummer"], "naam": r["naam"] or "", "min": minuten_sinds(r["onderweg_op"])})
+        routes_uit = []
+        for r in routes():
+            items = per_route.get(r["id"], [])
+            langste = max([i["min"] for i in items], default=0)
+            niveau = "leeg" if not items else ("rood" if langste >= 2 * drempel else "oranje" if langste >= drempel else "groen")
+            routes_uit.append({"nummer": r["nummer"], "open": items, "langste": langste, "niveau": niveau})
+        vandaag = nu(app)[:10]
+        klaar = db().execute("SELECT COUNT(*) c FROM bericht WHERE status='klaar' AND substr(klaar_op,1,10)=?", (vandaag,)).fetchone()["c"]
+        return {"tijd": nu(app)[11:16], "storing": gateway_storing(), "nieuw": nieuw, "routes": routes_uit,
+                "klaar_vandaag": klaar, "drempel": drempel,
+                "wachtend_nieuw_niveau": ("rood" if nieuw and nieuw[0]["min"] >= drempel else "oranje" if nieuw else "leeg")}
+
+    @app.get("/scherm")
+    def scherm():
+        if not scherm_toegang():
+            return redirect(url_for("login", next="/scherm"))
+        return render_template("scherm.html", sleutel=request.args.get("sleutel", ""))
+
+    @app.get("/scherm/data.json")
+    def scherm_data():
+        if not scherm_toegang():
+            abort(403)
+        resp = jsonify(scherm_gegevens())
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    @app.post("/beheer/scherm")
+    @rol_vereist("beheerder")
+    def beheer_scherm():
+        actie = request.form.get("actie")
+        if actie == "nieuw":
+            zet_instelling("scherm_sleutel", secrets.token_urlsafe(24))
+            audit("schermsleutel aangemaakt")
+        elif actie == "uit":
+            zet_instelling("scherm_sleutel", "")
+            audit("schermsleutel ingetrokken")
+        d = request.form.get("drempel", type=int)
+        if d and 1 <= d <= 600:
+            zet_instelling("scherm_drempel", d)
+        flash("Instellingen voor het overzichtsscherm opgeslagen.")
+        return redirect(url_for("beheer"))
 
     # ---------- e-mail en wachtwoord vergeten ----------
     MAILVELDEN = (("host", "SBL_SMTP_HOST", ""), ("poort", "SBL_SMTP_POORT", "587"),

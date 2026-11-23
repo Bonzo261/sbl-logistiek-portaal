@@ -15,6 +15,14 @@ Heartbeat (GET of POST): <code>{{ request.url_root }}api/heartbeat?sleutel={{ sl
 <label>Storing na <input type="number" name="storing_seconden" min="60" value="{{ storing_s }}"> seconden</label>
 <label>Meldings-URL (bijv. ntfy-topic) <input name="notificatie_url" value="{{ notificatie_url }}" placeholder="https://ntfy.sh/mijn-geheime-topic" size="38"></label>
 <label><input type="checkbox" name="nieuwe_sleutel" value="1"> nieuwe sleutel genereren</label><button>Opslaan</button></form></div>
+<div class="kaart"><h2>Overzichtsscherm (wand)</h2>
+<p class="klein">Open <a href="{{ url_for('scherm') }}">/scherm</a> op een groot scherm. Ingelogd als coördinator of beheerder werkt het meteen. Voor een scherm dat niet ingelogd hoeft te zijn kun je een geheime link aanmaken; die toont alleen stembureaunummers, namen en wachttijden (geen adressen of telefoonnummers). Wie de link heeft, kan meekijken: deel hem niet en trek hem in als hij uitlekt.</p>
+{% if scherm_sleutel %}<p><code style="word-break:break-all">{{ request.url_root }}scherm?sleutel={{ scherm_sleutel }}</code></p>{% endif %}
+<form method="post" action="{{ url_for('beheer_scherm') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<label>Waarschuwing (oranje) na <input type="number" name="drempel" min="1" max="600" value="{{ scherm_drempel }}" style="width:5rem"> minuten, rood na het dubbele</label>
+<button>Opslaan</button>
+<button name="actie" value="nieuw" class="grijs">{{ 'Nieuwe geheime link' if scherm_sleutel else 'Geheime link aanmaken' }}</button>
+{% if scherm_sleutel %}<button name="actie" value="uit" class="rood">Link intrekken</button>{% endif %}</form></div>
 <div class="kaart"><h2>E-mail (voor "wachtwoord vergeten")</h2>
 <p class="klein">Werkt met elke SMTP-server: een postvak van je hosting, Microsoft 365, Google Workspace, een mailservice of de mailrelay van de gemeente. Laat gebruiker en wachtwoord leeg als de server geen inlog vraagt.
 {% if mail_via_env %}<br><strong>Let op:</strong> de instellingen worden (deels) overschreven door omgevingsvariabelen <code>SBL_SMTP_*</code>.{% endif %}</p>
