@@ -507,6 +507,8 @@ def create_app(config=None):
         route_id = request.form.get("route_id", type=int)
         if not db().execute("SELECT 1 FROM route WHERE id=?", (route_id,)).fetchone():
             abort(400, "Onbekende route")
+        oud = db().execute("SELECT b.status, b.route_id, s.nummer, s.naam FROM bericht b "
+                           "LEFT JOIN stembureau s ON s.id=b.stembureau_id WHERE b.id=?", (bid,)).fetchone()
         if instelling("accepteren_verplicht", "0") == "1":
             # nieuw of nog niet geaccepteerd: (opnieuw) toewijzen; de chauffeur moet nog accepteren
             n = db().execute("UPDATE bericht SET status='toegewezen', route_id=?, onderweg_op=?, geaccepteerd_op=NULL "
@@ -518,6 +520,12 @@ def create_app(config=None):
             flash("Dit bericht kan niet (meer) verplaatst worden: de chauffeur heeft het al geaccepteerd of het is klaar.")
         else:
             audit(f"bericht {bid} naar route-id {route_id}")
+            if oud and oud["status"] == "toegewezen" and oud["route_id"] and oud["route_id"] != route_id:
+                nieuw_nr = db().execute("SELECT nummer FROM route WHERE id=?", (route_id,)).fetchone()["nummer"]
+                db().execute("DELETE FROM route_melding WHERE tijd<?", (time.time() - 86400,))
+                db().execute("INSERT INTO route_melding (route_id, tekst, tijd) VALUES (?,?,?)",
+                             (oud["route_id"], f"Stembureau {oud['nummer'] or '?'}{' – ' + oud['naam'] if oud['naam'] else ''} "
+                                               f"is toegewezen aan route {nieuw_nr} en vervalt hier.", time.time()))
         return redirect(url_for("portaal"))
 
     @app.post("/bericht/<int:bid>/accepteer")
@@ -579,7 +587,8 @@ def create_app(config=None):
         items = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                 WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.onderweg_op""", (route_id,)).fetchall()
-        return render_template("route.html", route=route, items=items,
+        laatste_melding = db().execute("SELECT COALESCE(MAX(id),0) m FROM route_melding WHERE route_id=?", (route_id,)).fetchone()["m"]
+        return render_template("route.html", route=route, items=items, laatste_melding=laatste_melding,
                                melding=instelling("melding_chauffeur", "1") == "1")
 
     @app.get("/route/<int:route_id>/status.json")
@@ -591,7 +600,10 @@ def create_app(config=None):
                                 LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                 WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.id""", (route_id,)).fetchall()
         handtekening = hashlib.sha1(";".join(f"{r['id']}:{r['status']}" for r in rijen).encode()).hexdigest()
+        na = request.args.get("na", 0, type=int)
+        meldingen = db().execute("SELECT id, tekst FROM route_melding WHERE route_id=? AND id>? ORDER BY id", (route_id, na)).fetchall()
         resp = jsonify(handtekening=handtekening, melding=instelling("melding_chauffeur", "1") == "1",
+                       meldingen=[{"id": m["id"], "tekst": m["tekst"]} for m in meldingen],
                        items=[{"id": r["id"], "nr": r["nummer"], "naam": r["naam"] or "", "status": r["status"]} for r in rijen])
         resp.headers["Cache-Control"] = "no-store"
         return resp

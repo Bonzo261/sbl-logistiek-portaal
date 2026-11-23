@@ -14,12 +14,13 @@
 </div>{% endfor %}{% if not items %}<p class="klein">Geen openstaande opdrachten.</p>{% endif %}</div>
 <script>
 (function(){
- var bekend={{ items|map(attribute='id')|list|tojson }}, hand=null, melding={{ 'true' if melding else 'false' }}, lock=null;
+ var bekend={{ items|map(attribute='id')|list|tojson }}, hand=null, laatsteMelding={{ laatste_melding }}, melding={{ 'true' if melding else 'false' }}, lock=null;
  var popup=document.getElementById('popup'),tekst=document.getElementById('popuptekst');
  SBLGeluid.init({toegestaan:melding});
  document.getElementById('popupknop').addEventListener('click',function(){popup.style.display='none';});
- function toonPopup(nieuwe){
-  tekst.textContent='🔔 Nieuwe opdracht: '+nieuwe.map(function(i){return 'stembureau '+(i.nr||'?')+(i.naam?' – '+i.naam:'');}).join(', ');
+ function toonPopup(regels,oranje){
+  tekst.textContent=regels.join(' · ');
+  popup.style.background=oranje?'#b45309':'#16a34a';
   popup.style.display='flex';
   SBLGeluid.signaal([300,150,300,150,300]);
  }
@@ -30,7 +31,7 @@
   });
  }
  function poll(){
-  fetch(location.pathname.replace(/\/$/,'')+'/status.json',{cache:'no-store',credentials:'same-origin'}).then(function(r){
+  fetch(location.pathname.replace(/\/$/,'')+'/status.json?na='+laatsteMelding,{cache:'no-store',credentials:'same-origin'}).then(function(r){
    if(r.redirected||!r.ok){if(r.redirected)location.reload();return null;}return r.json();
   }).then(function(s){
    if(!s)return;
@@ -38,7 +39,9 @@
    var ids=s.items.map(function(i){return i.id;});
    var nieuwe=s.items.filter(function(i){return bekend.indexOf(i.id)<0;});
    if(hand!==null&&s.handtekening!==hand)ververs();
-   if(nieuwe.length&&melding)toonPopup(nieuwe);
+   var verplaatst=(s.meldingen||[]).map(function(m){laatsteMelding=Math.max(laatsteMelding,m.id);return '↪ '+m.tekst;});
+   if(melding&&verplaatst.length)toonPopup(verplaatst,true);
+   else if(nieuwe.length&&melding)toonPopup(nieuwe.map(function(i){return '🔔 Nieuwe opdracht: stembureau '+(i.nr||'?')+(i.naam?' – '+i.naam:'');}),false);
    bekend=ids;hand=s.handtekening;
   }).catch(function(){});
  }
