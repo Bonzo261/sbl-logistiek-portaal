@@ -1,6 +1,8 @@
+<p align="center"><img src="sbl/static/logo.svg" alt="SBL – StemBureauLogistiek" width="320"></p>
+
 # SBL Logistiek Portaal
 
-Webapp voor de logistiek rond stembureaus. Een voorzitter stuurt een sms met alleen het stembureaunummer. De coördinator ziet de melding met adres en telefoonnummer en kiest de (geadviseerde) route. De chauffeur van die route ziet de opdracht, belt de voorzitter en vinkt af.
+**SBL staat voor StemBureauLogistiek.** Webapp voor de logistiek rond stembureaus. Een voorzitter stuurt een sms met alleen het stembureaunummer. De coördinator ziet de melding met adres en telefoonnummer en kiest de (geadviseerde) route. De chauffeur van die route ziet de opdracht, belt de voorzitter en vinkt af.
 
 Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen server, ook in de cloud. De beheerder van de installatie is zelf verantwoordelijk voor beheer, updates en back-ups.
 
@@ -95,3 +97,6 @@ Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezi
 
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.
+
+## Logo
+Het logo en de favicon staan in `sbl/static/` (`logo.svg`, `logo-licht.svg` voor donkere achtergronden, `icon.svg`, `favicon.ico` en PNG-varianten) en vallen onder dezelfde licentie als de software. Het ontwerp: een stembiljet met vinkje dat in een stembus gaat.

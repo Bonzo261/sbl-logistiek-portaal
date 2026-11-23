@@ -676,3 +676,12 @@ def test_oude_route_krijgt_melding_bij_verplaatsen(client):
     assert ch2.get("/route/2/status.json").get_json()["items"][0]["nr"] == 5
     # pagina begint na de laatste melding, zodat oude meldingen niet opnieuw getoond worden
     assert f"laatsteMelding={m[0]['id']}" in ch1.get("/route/1").get_data(as_text=True).replace(" ", "")
+
+
+def test_logo_en_favicon(client):
+    r = client.get("/favicon.ico")
+    assert r.status_code == 200 and r.data[:4] == b"\x00\x00\x01\x00"
+    for f in ("favicon.svg", "logo.svg", "logo-licht.svg", "icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png"):
+        assert client.get("/static/" + f).status_code == 200
+    login = client.get("/login").get_data(as_text=True)
+    assert "favicon.svg" in login and "logo.svg" in login and "StemBureauLogistiek" in login
