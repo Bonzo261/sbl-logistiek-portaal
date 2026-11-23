@@ -751,3 +751,25 @@ def test_logboek_filter(client):
     maak_admin(client)
     t = client.get("/beheer/audit?type=Gateway").get_data(as_text=True)
     assert "Gateway" in t and "inloggen" not in t.split("<table>")[1]
+
+
+def test_sms_nummer_en_robuustheid(client):
+    maak_admin(client)
+    sl = sleutel(client)
+    for tekst in ("²", "9" * 5000, "stembureau ²12", ""):
+        r = client.post("/api/sms?sleutel=" + sl, data={"message": tekst})
+        assert r.status_code == 201, tekst
+
+
+def test_api_sleutel_throttle(client):
+    maak_admin(client)
+    codes = [client.post("/api/sms?sleutel=fout", data={"message": "1"}).status_code for _ in range(32)]
+    assert codes[0] == 403 and codes[-1] == 429
+    assert client.post("/api/sms?sleutel=" + sleutel(client), data={"message": "1"}).status_code == 429
+
+
+def test_beveiligingsheaders(client):
+    r = client.get("/login")
+    assert "default-src 'self'" in r.headers["Content-Security-Policy"]
+    assert r.headers["Cache-Control"] == "no-store"
+    assert client.get("/static/stijl.css").headers.get("Cache-Control") != "no-store"

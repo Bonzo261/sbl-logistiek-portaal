@@ -406,23 +406,31 @@ def create_app(config=None):
                 return str(v).strip()
         return ""
 
+    def api_sleutel_controle():
+        """Controleert de webhook-sleutel; blokkeert een IP-adres na te veel foute pogingen (raadaanvallen)."""
+        sleutel = request.headers.get("X-SBL-Sleutel") or request.args.get("sleutel", "")
+        k = "api-ip:" + (request.remote_addr or "")
+        nu_ts = time.time()
+        db().execute("DELETE FROM login_poging WHERE tijd<?", (nu_ts - 900,))
+        if db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel=?", (k,)).fetchone()["c"] >= 30:
+            abort(429)
+        if not secrets.compare_digest(sleutel.encode(), instelling("sms_sleutel").encode()):
+            db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, k))
+            abort(403)
+
     @app.post("/api/sms")
     def api_sms():
-        sleutel = request.headers.get("X-SBL-Sleutel") or request.args.get("sleutel", "")
-        if not secrets.compare_digest(sleutel, instelling("sms_sleutel")):
-            abort(403)
+        api_sleutel_controle()
         tekst = sms_tekst()
-        digits = "".join(ch for ch in tekst if ch.isdigit())
-        sb = db().execute("SELECT * FROM stembureau WHERE nummer=?", (int(digits),)).fetchone() if digits else None
+        m = re.search(r"[0-9]{1,9}", tekst)  # eerste getal in de tekst is het stembureaunummer
+        sb = db().execute("SELECT * FROM stembureau WHERE nummer=?", (int(m.group()),)).fetchone() if m else None
         cur = db().execute("INSERT INTO bericht (stembureau_id, tekst, ontvangen) VALUES (?,?,?)",
                            (sb["id"] if sb else None, tekst[:500], nu(app)))
         return jsonify(ok=True, id=cur.lastrowid, herkend=bool(sb)), 201
 
     @app.route("/api/heartbeat", methods=["GET", "POST"])
     def api_heartbeat():
-        sleutel = request.headers.get("X-SBL-Sleutel") or request.args.get("sleutel", "")
-        if not secrets.compare_digest(sleutel, instelling("sms_sleutel")):
-            abort(403)
+        api_sleutel_controle()
         zet_instelling("laatste_ping", nu(app))
         return jsonify(ok=True)
 
@@ -1388,6 +1396,14 @@ def create_app(config=None):
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "same-origin")
+        resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        resp.headers.setdefault("Content-Security-Policy",
+                                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+        if not request.path.startswith("/static/"):
+            resp.headers.setdefault("Cache-Control", "no-store")  # geen persoonsgegevens in de browsercache
         return resp
 
     return app
