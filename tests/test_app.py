@@ -154,3 +154,65 @@ def test_qr_code():
     pytest.importorskip("segno")
     from sbl import totp
     assert totp.qr_svg("otpauth://totp/x?secret=ABC").startswith("data:image/svg+xml")
+
+
+def test_wachtwoord_wijzigen_en_reset(client):
+    c = client
+    maak_admin(c)
+    assert "klopt niet" in post(c, "/account/wachtwoord", {"huidig": "fout", "nieuw": "nieuwwachtwoord1", "nieuw2": "nieuwwachtwoord1"},
+                                "/account", follow_redirects=True).get_data(as_text=True)
+    post(c, "/account/wachtwoord", {"huidig": "langwachtwoord1", "nieuw": "nieuwwachtwoord1", "nieuw2": "nieuwwachtwoord1"}, "/account")
+    post(c, "/logout", tokenurl="/account")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "nieuwwachtwoord1"})
+    assert c.get("/beheer").status_code == 200
+    # beheerder reset wachtwoord van een andere gebruiker
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "co", "wachtwoord": "coordinator123", "rol": "coordinator"}, "/beheer/gebruikers")
+    uid = re.findall(r"/beheer/gebruikers/(\d+)/wachtwoord", c.get("/beheer/gebruikers").get_data(as_text=True))[-1]
+    post(c, f"/beheer/gebruikers/{uid}/wachtwoord", {"nieuw": "weergewijzigd99"}, "/beheer/gebruikers")
+    post(c, "/logout", tokenurl="/beheer")
+    r = post(c, "/login", {"naam": "co", "wachtwoord": "weergewijzigd99"})
+    assert r.status_code == 302
+
+
+def test_backup_en_herstel(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "7", "naam": "Test", "adres": "x", "telefoon": "0611111111", "route_id": ""}, "/beheer/stembureaus")
+    bk = post(c, "/beheer/backup/download", tokenurl="/beheer/backup")
+    assert bk.status_code == 200 and bk.data[:15] == b"SQLite format 3"
+    post(c, "/beheer/stembureaus/1/verwijder", tokenurl="/beheer/stembureaus")
+    assert "Test" not in c.get("/beheer/stembureaus").get_data(as_text=True)
+    # ongeldig bestand wordt geweigerd
+    r = post(c, "/beheer/backup/herstel", {"bestand": (io.BytesIO(b"geen database"), "x.db"), "bevestig": "HERSTEL"},
+             "/beheer/backup", content_type="multipart/form-data", follow_redirects=True)
+    assert "geen geldig" in r.get_data(as_text=True)
+    # zonder bevestiging gebeurt er niets
+    r = post(c, "/beheer/backup/herstel", {"bestand": (io.BytesIO(bk.data), "x.db"), "bevestig": "nee"},
+             "/beheer/backup", content_type="multipart/form-data", follow_redirects=True)
+    assert "typ HERSTEL" in r.get_data(as_text=True)
+    post(c, "/beheer/backup/herstel", {"bestand": (io.BytesIO(bk.data), "x.db"), "bevestig": "herstel"},
+         "/beheer/backup", content_type="multipart/form-data")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert "Test" in c.get("/beheer/stembureaus").get_data(as_text=True)
+
+
+def test_herstelcode_werkt_een_keer(tmp_path):
+    import time
+    from sbl import totp
+    c = create_app({"DATABASE": str(tmp_path / "h.db"), "TESTING": True}).test_client()
+    post(c, "/setup", {"naam": "admin", "wachtwoord": "langwachtwoord1"}, "/setup")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    post(c, "/account/2fa/start", tokenurl="/account")
+    geheim = re.search(r"<code[^>]*>(\w+)</code>", c.get("/account").get_data(as_text=True)).group(1)
+    r = post(c, "/account/2fa/bevestig", {"code": totp.code(geheim, int(time.time() // 30))}, "/account")
+    codes = re.findall(r"[A-Z0-9]{5}-[A-Z0-9]{5}", r.get_data(as_text=True))
+    assert len(codes) == 8
+    post(c, "/logout", tokenurl="/portaal")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    post(c, "/login/2fa", {"code": codes[0].lower()}, "/login/2fa")
+    assert c.get("/portaal").status_code == 200
+    post(c, "/logout", tokenurl="/portaal")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    post(c, "/login/2fa", {"code": codes[0]}, "/login/2fa")  # hergebruik
+    assert c.get("/portaal").status_code == 302

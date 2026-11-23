@@ -1,0 +1,9 @@
+{% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p><h1>Back-up en herstel</h1>
+<div class="kaart"><h2>Back-up downloaden</h2>
+<p class="klein">Alle gegevens in één bestand: stembureaus, routes, berichten, gebruikers (met wachtwoord-hashes en 2FA-sleutels) en instellingen. Bewaar het bestand veilig; wie het heeft, heeft toegang tot de gegevens.</p>
+<form method="post" action="{{ url_for('backup_download') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="groen">Back-up downloaden</button></form></div>
+<div class="kaart"><h2>Herstellen uit een back-up</h2>
+<p class="klein"><strong>Let op:</strong> alle huidige gegevens worden vervangen door de inhoud van de back-up. Je wordt uitgelogd.</p>
+<form method="post" action="{{ url_for('backup_herstel') }}" enctype="multipart/form-data" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input type="file" name="bestand" accept=".db" required><input name="bevestig" placeholder="Typ HERSTEL" required><button class="rood">Herstellen</button></form></div>
+{% endblock %}

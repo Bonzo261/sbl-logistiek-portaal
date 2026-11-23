@@ -1,0 +1,5 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Herstelcodes</h1>
+<div class="kaart"><p><strong>Bewaar deze codes nu op een veilige plek</strong> (bijvoorbeeld in een wachtwoordmanager of geprint in een kluis). Ze worden maar één keer getoond. Elke code werkt één keer, als je geen toegang hebt tot je authenticator-app.</p>
+<pre style="font-size:1.2rem;line-height:1.8">{% for c in codes %}{{ c }}
+{% endfor %}</pre>
+<p><a class="knop groen" href="{{ url_for('start') }}">Ik heb ze bewaard</a></p></div>{% endblock %}
