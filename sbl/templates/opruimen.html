@@ -1,0 +1,11 @@
+{% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p>
+<h1>Opruimen na de verkiezing</h1>
+<div class="kaart"><p class="klein">Verwijder gegevens die je niet meer nodig hebt, zodat er geen persoonsgegevens blijven staan. <strong>Wissen kan niet ongedaan worden gemaakt.</strong> Download eerst eventueel een back-up bij <a href="{{ url_for('beheer_backup_pagina') }}">Back-up</a> als je de gegevens wilt bewaren.</p>
+<form method="post" action="{{ url_for('beheer_opruimen_uitvoeren') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<p><label><input type="checkbox" name="berichten" value="1"> Alle berichten (sms'jes en meldingen aan routes) – {{ n.berichten }}</label></p>
+<p><label><input type="checkbox" name="chauffeurs" value="1"> Alle chauffeursaccounts – {{ n.chauffeurs }}</label></p>
+<p><label><input type="checkbox" name="stembureaus" value="1"> Alle stembureaus (adressen en telefoonnummers; later opnieuw te importeren) – {{ n.stembureaus }}</label></p>
+<p><label><input type="checkbox" name="logboek" value="1"> Het logboek – {{ n.logboek }} regels</label></p>
+<p><label><input type="checkbox" name="backups" value="1"> Alle automatische back-ups op de server – {{ n.backups }}</label></p>
+<p class="klein">Zonder de keuze voor back-ups maakt de app vóór het wissen eerst een back-up. Die bevat dan nog de gegevens; verwijder hem later bij <em>Back-up</em> of met de keuze hierboven. Gedownloade back-ups buiten de server moet je zelf opruimen. Coördinator- en beheerdersaccounts blijven bestaan.</p>
+<div class="rij"><input name="bevestig" placeholder="Typ OPRUIMEN" required><button class="rood">Opruimen</button></div></form></div>{% endblock %}

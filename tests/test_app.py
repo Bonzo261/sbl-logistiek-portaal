@@ -773,3 +773,29 @@ def test_beveiligingsheaders(client):
     assert "default-src 'self'" in r.headers["Content-Security-Policy"]
     assert r.headers["Cache-Control"] == "no-store"
     assert client.get("/static/stijl.css").headers.get("Cache-Control") != "no-store"
+
+
+def test_opruimen(client):
+    maak_admin(client)
+    t = token(client)
+    sl = sleutel(client)
+    client.post("/api/sms?sleutel=" + sl, data={"message": "5"})
+    r = client.post("/beheer/opruimen", data={"csrf": t, "berichten": "1", "bevestig": "nee"}, follow_redirects=True)
+    assert "Er is niets gewist" in r.get_data(as_text=True)
+    assert client.get("/beheer/opruimen").status_code == 200
+    r = client.post("/beheer/opruimen", data={"csrf": t, "berichten": "1", "logboek": "1", "bevestig": "OPRUIMEN"}, follow_redirects=True)
+    assert "Opgeruimd" in r.get_data(as_text=True)
+    import sqlite3
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    assert con.execute("SELECT COUNT(*) FROM bericht").fetchone()[0] == 0
+    assert con.execute("SELECT COUNT(*) FROM gebruiker WHERE rol='beheerder'").fetchone()[0] == 1
+    assert con.execute("SELECT COUNT(*) FROM audit WHERE actie LIKE 'opgeruimd%'").fetchone()[0] == 1
+
+
+def test_opruimen_backups_en_chauffeurs(client):
+    maak_admin(client)
+    t = token(client)
+    client.post("/beheer/backup/nu", data={"csrf": t})
+    assert "1</" in client.get("/beheer/opruimen").get_data(as_text=True)
+    r = client.post("/beheer/opruimen", data={"csrf": t, "backups": "1", "chauffeurs": "1", "bevestig": "OPRUIMEN"}, follow_redirects=True)
+    assert "Opgeruimd" in r.get_data(as_text=True) and "1 backups" in r.get_data(as_text=True)

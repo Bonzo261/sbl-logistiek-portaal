@@ -30,11 +30,12 @@ def nu(app=None):
 
 
 
-AUDIT_TYPES = ["Gateway", "Berichten", "Inloggen en account", "Gebruikers", "Stembureaus en routes", "Instellingen", "Back-up", "Overig"]
+AUDIT_TYPES = ["Gateway", "Berichten", "Inloggen en account", "Gebruikers", "Stembureaus en routes", "Instellingen", "Back-up", "Opruimen", "Overig"]
 _AUDIT_REGELS = [
     ("Gateway", ("gateway",)),
     ("Berichten", ("bericht ",)),
     ("Back-up", ("back-up",)),
+    ("Opruimen", ("opgeruimd",)),
     ("Gebruikers", ("gebruiker", "bulk:", "selectie:", "wachtwoordenlijst", "wachtwoord gereset", "2fa gereset", "e-mailadres")),
     ("Inloggen en account", ("inloggen", "uitgelogd", "wachtwoord", "2fa", "herstelcode")),
     ("Stembureaus en routes", ("stembureau", "import van", "aantal routes")),
@@ -1071,6 +1072,62 @@ def create_app(config=None):
             audit("back-upinstellingen gewijzigd")
             flash("Back-upinstellingen opgeslagen.")
         return redirect(url_for("beheer_backup_pagina"))
+
+    # ---------- opruimen na de verkiezing ----------
+    def opruim_aantallen():
+        c = db()
+        return {
+            "berichten": c.execute("SELECT COUNT(*) c FROM bericht").fetchone()["c"],
+            "chauffeurs": c.execute("SELECT COUNT(*) c FROM gebruiker WHERE rol='chauffeur'").fetchone()["c"],
+            "logboek": c.execute("SELECT COUNT(*) c FROM audit").fetchone()["c"],
+            "backups": len(backups_lijst()),
+            "stembureaus": c.execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
+        }
+
+    @app.get("/beheer/opruimen")
+    @rol_vereist("beheerder")
+    def beheer_opruimen():
+        return render_template("opruimen.html", n=opruim_aantallen())
+
+    @app.post("/beheer/opruimen")
+    @rol_vereist("beheerder")
+    def beheer_opruimen_uitvoeren():
+        keuze = [k for k in ("berichten", "chauffeurs", "stembureaus", "logboek", "backups") if request.form.get(k)]
+        if not keuze:
+            flash("Kies minstens één onderdeel om op te ruimen.")
+            return redirect(url_for("beheer_opruimen"))
+        if request.form.get("bevestig", "").strip() != "OPRUIMEN":
+            flash("Typ OPRUIMEN om te bevestigen. Er is niets gewist.")
+            return redirect(url_for("beheer_opruimen"))
+        c = db()
+        veiligheid = None
+        if "backups" not in keuze:
+            c.commit()
+            veiligheid = auto_backup(forceer=True)
+            if not veiligheid:
+                flash("Er kon geen back-up vooraf worden gemaakt; er is niets gewist.")
+                return redirect(url_for("beheer_opruimen"))
+        n = {}
+        if "berichten" in keuze:
+            n["berichten"] = c.execute("DELETE FROM bericht").rowcount
+            c.execute("DELETE FROM route_melding")
+        if "chauffeurs" in keuze:
+            n["chauffeurs"] = c.execute("DELETE FROM gebruiker WHERE rol='chauffeur'").rowcount
+        if "stembureaus" in keuze:
+            n["stembureaus"] = c.execute("DELETE FROM stembureau").rowcount
+        if "logboek" in keuze:
+            n["logboek"] = c.execute("DELETE FROM audit").rowcount
+        if "backups" in keuze:
+            m = backup_map()
+            k = 0
+            for b in backups_lijst():
+                os.remove(os.path.join(m, b["naam"]))
+                k += 1
+            n["backups"] = k
+        audit("opgeruimd: " + ", ".join(f"{k} {v}" for k, v in n.items()))
+        flash("Opgeruimd: " + ", ".join(f"{v} {k}" for k, v in n.items()) + "." +
+              (f" Back-up vooraf: {veiligheid}; verwijder die later als ook die weg moet." if veiligheid else ""))
+        return redirect(url_for("beheer_opruimen"))
 
     @app.post("/beheer/backup/nu")
     @rol_vereist("beheerder")
