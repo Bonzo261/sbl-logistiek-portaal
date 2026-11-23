@@ -13,5 +13,7 @@
 {% if overgeslagen %}<p class="klein">Overgeslagen (bestond al): {{ overgeslagen|join(', ') }}</p>{% endif %}
 <table><tr><th>Route</th><th>Gebruikersnaam</th><th>Tijdelijk wachtwoord</th></tr>
 {% for naam, nr, ww in resultaat %}<tr><td>{{ nr or "–" }}</td><td>{{ naam }}</td><td><code>{{ ww }}</code></td></tr>{% endfor %}</table>
-<p><button onclick="window.print()">Afdrukken</button></p></div>
+<p class="rij"><button onclick="window.print()">Afdrukken</button>
+<form method="post" action="{{ url_for('wachtwoorden_excel') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input type="hidden" name="data" value="{{ resultaat|tojson|forceescape }}"><button class="groen">Downloaden als Excel</button></form></p></div>
 {% endif %}{% endblock %}
