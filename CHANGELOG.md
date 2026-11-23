@@ -1,8 +1,9 @@
 # Changelog
 
-Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); de versies zijn nog niet getagd.
+Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); versies worden als git-tag (`v0.1.0`) en als Docker-image met dezelfde tag gepubliceerd.
 
-## [Niet uitgebracht]
+## [0.1.0] – 2026-11-23
+Eerste versie, losgemaakt van Home Assistant.
 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
@@ -38,10 +39,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 - GitHub Action die na geslaagde tests een Docker-image naar Docker Hub publiceert
 - QR-code bij het instellen van 2FA (`segno`)
 
-## [0.1.0] – 2026-11-23
-Eerste versie, losgemaakt van Home Assistant.
-
-### Toegevoegd
+### Basis
 - Datamodel voor stembureaus, routes, berichten, gebruikers en instellingen (SQLite)
 - Rollen beheerder, coördinator en chauffeur; chauffeur gekoppeld aan één route
 - Sms-webhook, route-advies, portaal (Nieuw → Onderweg → Klaar) en routepagina met bel- en navigatieknop

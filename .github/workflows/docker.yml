@@ -2,6 +2,7 @@ name: docker-image
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 jobs:
   publiceer:
@@ -16,11 +17,17 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/sbl-logistiek-portaal
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long,prefix=
+            type=semver,pattern={{version}}
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/sbl-logistiek-portaal:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/sbl-logistiek-portaal:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
