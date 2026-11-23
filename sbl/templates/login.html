@@ -2,4 +2,4 @@
 <form method="post" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <p><input name="naam" placeholder="Naam" autocomplete="username" required></p>
 <p><input type="password" name="wachtwoord" placeholder="Wachtwoord" autocomplete="current-password" required></p>
-<button>Inloggen</button></form>{% endblock %}
+<button>Inloggen</button>{% if mail_ingesteld %} <a href="{{ url_for('wachtwoord_vergeten') }}" style="margin-left:1rem">Wachtwoord vergeten?</a>{% endif %}</form>{% endblock %}

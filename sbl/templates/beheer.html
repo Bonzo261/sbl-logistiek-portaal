@@ -15,4 +15,17 @@ Heartbeat (GET of POST): <code>{{ request.url_root }}api/heartbeat?sleutel={{ sl
 <label>Storing na <input type="number" name="storing_seconden" min="60" value="{{ storing_s }}"> seconden</label>
 <label>Meldings-URL (bijv. ntfy-topic) <input name="notificatie_url" value="{{ notificatie_url }}" placeholder="https://ntfy.sh/mijn-geheime-topic" size="38"></label>
 <label><input type="checkbox" name="nieuwe_sleutel" value="1"> nieuwe sleutel genereren</label><button>Opslaan</button></form></div>
+<div class="kaart"><h2>E-mail (voor "wachtwoord vergeten")</h2>
+<p class="klein">Werkt met elke SMTP-server: een postvak van je hosting, Microsoft 365, Google Workspace, een mailservice of de mailrelay van de gemeente. Laat gebruiker en wachtwoord leeg als de server geen inlog vraagt.
+{% if mail_via_env %}<br><strong>Let op:</strong> de instellingen worden (deels) overschreven door omgevingsvariabelen <code>SBL_SMTP_*</code>.{% endif %}</p>
+<form method="post" action="{{ url_for('beheer_mail') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<div class="rij"><label>Server <input name="host" value="{{ mail.host }}" placeholder="mail.voorbeeld.nl"></label>
+<label>Poort <input name="poort" type="number" value="{{ mail.poort }}" style="width:6rem"></label>
+<label>Beveiliging <select name="beveiliging">{% for v, n in [('starttls','STARTTLS (587)'),('ssl','SSL/TLS (465)'),('geen','Geen (25)')] %}<option value="{{ v }}" {% if mail.beveiliging == v %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label></div>
+<div class="rij" style="margin-top:.5rem"><label>Gebruiker <input name="gebruiker" value="{{ mail.gebruiker }}" autocomplete="off"></label>
+<label>Wachtwoord <input type="password" name="wachtwoord" placeholder="{{ '(ingesteld – leeg laten om te behouden)' if mail.wachtwoord else '' }}" autocomplete="new-password"></label>
+{% if mail.wachtwoord %}<label class="klein"><input type="checkbox" name="wachtwoord_wissen" value="1"> wachtwoord wissen</label>{% endif %}</div>
+<div class="rij" style="margin-top:.5rem"><label>Afzenderadres <input name="van" type="email" value="{{ mail.van }}" placeholder="noreply@voorbeeld.nl"></label>
+<label>Webadres van deze site <input name="publieke_url" value="{{ mail.publieke_url or request.url_root.rstrip('/') }}" size="30"></label></div>
+<p class="rij" style="margin-top:.8rem"><button>Opslaan</button><button name="testmail" value="1" class="groen">Opslaan en testmail naar mezelf</button></p></form></div>
 {% endblock %}

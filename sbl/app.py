@@ -1,6 +1,7 @@
 """SBL Logistiek Portaal - kern van de webapp."""
 import io
 import json
+import hashlib
 import re
 import os
 import secrets
@@ -17,7 +18,7 @@ from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import importer, totp
+from . import importer, mail, totp
 
 HIER = os.path.dirname(__file__)
 ROLLEN = ("beheerder", "coordinator", "chauffeur")
@@ -530,7 +531,8 @@ def create_app(config=None):
                                n_routes=db().execute("SELECT COUNT(*) c FROM route").fetchone()["c"],
                                n_sb=db().execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
-                               notificatie_url=instelling("notificatie_url"))
+                               notificatie_url=instelling("notificatie_url"),
+                               mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")))
 
     @app.post("/beheer/routes")
     @rol_vereist("beheerder")
@@ -877,6 +879,128 @@ def create_app(config=None):
         session.clear()
         flash("Back-up hersteld. Log opnieuw in.")
         return redirect(url_for("login"))
+
+    # ---------- e-mail en wachtwoord vergeten ----------
+    MAILVELDEN = (("host", "SBL_SMTP_HOST", ""), ("poort", "SBL_SMTP_POORT", "587"),
+                  ("beveiliging", "SBL_SMTP_BEVEILIGING", "starttls"), ("gebruiker", "SBL_SMTP_GEBRUIKER", ""),
+                  ("wachtwoord", "SBL_SMTP_WACHTWOORD", ""), ("van", "SBL_SMTP_VAN", ""),
+                  ("publieke_url", "SBL_PUBLIEKE_URL", ""))
+
+    def mail_config():
+        """Omgevingsvariabelen gaan voor op de instellingen in de database."""
+        return {k: os.environ.get(env) or instelling("smtp_" + k, d) for k, env, d in MAILVELDEN}
+
+    def mail_ingesteld():
+        c = mail_config()
+        return bool(c["host"] and c["van"] and c["publieke_url"].startswith(("http://", "https://")))
+
+    @app.context_processor
+    def mail_context():
+        return {"mail_ingesteld": mail_ingesteld()}
+
+    def verstuur_op_achtergrond(aan, onderwerp, tekst):
+        cfg = mail_config()
+
+        def werk():
+            try:
+                mail.stuur(cfg, aan, onderwerp, tekst)
+            except mail.MailFout as e:
+                app.logger.warning("Mail naar gebruiker mislukt: %s", e)
+        if app.config.get("TESTING"):
+            werk()
+        else:
+            threading.Thread(target=werk, daemon=True).start()
+
+    def token_hash(token):
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @app.route("/wachtwoord-vergeten", methods=["GET", "POST"])
+    def wachtwoord_vergeten():
+        if not mail_ingesteld():
+            abort(404)
+        if request.method == "POST":
+            adres = request.form.get("email", "").strip().lower()
+            nu_ts = time.time()
+            db().execute("DELETE FROM login_poging WHERE tijd<?", (nu_ts - 900,))
+            sleutels = ("reset-ip:" + (request.remote_addr or ""), "reset:" + adres)
+            if db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel IN (?,?)", sleutels).fetchone()["c"] >= 5:
+                flash("Te veel aanvragen. Probeer het over 15 minuten opnieuw.")
+                return render_template("vergeten.html"), 429
+            for k in sleutels:
+                db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, k))
+            u = db().execute("SELECT * FROM gebruiker WHERE lower(email)=? AND email!=''", (adres,)).fetchone()
+            if u:
+                token = secrets.token_urlsafe(32)
+                db().execute("DELETE FROM herstel_token WHERE gebruiker_id=?", (u["id"],))
+                db().execute("INSERT INTO herstel_token (gebruiker_id, hash, verloopt) VALUES (?,?,?)",
+                             (u["id"], token_hash(token), nu_ts + 3600))
+                db().commit()
+                link = mail_config()["publieke_url"].rstrip("/") + url_for("wachtwoord_herstel", token=token)
+                verstuur_op_achtergrond(u["email"], "SBL Portaal: wachtwoord opnieuw instellen",
+                                        f"Hallo {u['naam']},\n\nVia deze link kies je een nieuw wachtwoord (één uur geldig, "
+                                        f"één keer te gebruiken):\n\n{link}\n\nHeb je dit niet aangevraagd? Dan kun je deze "
+                                        f"e-mail negeren; je wachtwoord blijft ongewijzigd.\n")
+                audit(f"wachtwoordherstel aangevraagd voor gebruiker-id {u['id']}")
+            return render_template("vergeten.html", verzonden=True)  # zelfde antwoord, ook bij onbekend adres
+        return render_template("vergeten.html")
+
+    @app.route("/wachtwoord-herstel/<token>", methods=["GET", "POST"])
+    def wachtwoord_herstel(token):
+        rij = db().execute("SELECT * FROM herstel_token WHERE hash=? AND verloopt>?",
+                           (token_hash(token), time.time())).fetchone()
+        if not rij:
+            return render_template("melding.html", tekst="Deze link is ongeldig of verlopen. Vraag een nieuwe aan."), 410
+        if request.method == "POST":
+            nieuw = request.form.get("nieuw", "")
+            if len(nieuw) < 10 or nieuw != request.form.get("nieuw2"):
+                flash("Minimaal 10 tekens, en beide velden moeten gelijk zijn.")
+            else:
+                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0 WHERE id=?",
+                             (generate_password_hash(nieuw), rij["gebruiker_id"]))
+                db().execute("DELETE FROM herstel_token WHERE gebruiker_id=?", (rij["gebruiker_id"],))
+                db().execute("DELETE FROM login_poging WHERE sleutel=(SELECT 'n:' || lower(naam) FROM gebruiker WHERE id=?)",
+                             (rij["gebruiker_id"],))
+                audit(f"wachtwoord hersteld via e-mail voor gebruiker-id {rij['gebruiker_id']}")
+                flash("Wachtwoord ingesteld. Log nu in (2FA blijft gelden).")
+                return redirect(url_for("login"))
+        return render_template("herstel.html")
+
+    @app.post("/beheer/mail")
+    @rol_vereist("beheerder")
+    def beheer_mail():
+        f = request.form
+        bev = f.get("beveiliging", "starttls")
+        poort = f.get("poort", type=int)
+        van = f.get("van", "").strip()
+        url = f.get("publieke_url", "").strip()
+        if bev not in mail.BEVEILIGING or (poort is not None and not 1 <= poort <= 65535) or (van and not geldig_email(van)) \
+                or (url and not url.startswith(("http://", "https://"))):
+            flash("Controleer de mailinstellingen (poort, beveiliging, afzenderadres, webadres).")
+            return redirect(url_for("beheer"))
+        zet_instelling("smtp_host", f.get("host", "").strip())
+        zet_instelling("smtp_poort", poort or 587)
+        zet_instelling("smtp_beveiliging", bev)
+        zet_instelling("smtp_gebruiker", f.get("gebruiker", "").strip())
+        if f.get("wachtwoord"):
+            zet_instelling("smtp_wachtwoord", f["wachtwoord"])
+        elif f.get("wachtwoord_wissen"):
+            zet_instelling("smtp_wachtwoord", "")
+        zet_instelling("smtp_van", van)
+        zet_instelling("smtp_publieke_url", url.rstrip("/"))
+        audit("mailinstellingen gewijzigd")
+        if f.get("testmail"):
+            aan = g.gebruiker["email"]
+            if not aan:
+                flash("Instellingen opgeslagen. Vul eerst je eigen e-mailadres in (Mijn account) om een testmail te kunnen ontvangen.")
+            else:
+                try:
+                    mail.stuur(mail_config(), aan, "SBL Portaal: testmail", "Dit is een testmail van het SBL Portaal. De mailinstellingen werken.")
+                    flash(f"Instellingen opgeslagen. Testmail verstuurd naar {aan}.")
+                except mail.MailFout as e:
+                    flash(f"Instellingen opgeslagen, maar de testmail is mislukt: {e}")
+        else:
+            flash("Mailinstellingen opgeslagen.")
+        return redirect(url_for("beheer"))
 
     @app.get("/beheer/audit")
     @rol_vereist("beheerder")

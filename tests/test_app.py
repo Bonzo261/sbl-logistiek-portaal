@@ -319,3 +319,97 @@ def test_email_instellen(client):
     # leegmaken kan
     post(c, "/account/email", {"email": ""}, "/account")
     assert 'value="beheer@' not in c.get("/account").get_data(as_text=True)
+
+
+class NepSMTP:
+    verzonden = []
+    fout = None
+
+    def __init__(self, host, poort, timeout=0, context=None):
+        self.host, self.poort = host, poort
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def ehlo(self): pass
+    def starttls(self, context=None): pass
+
+    def login(self, g, w):
+        if NepSMTP.fout:
+            import smtplib
+            raise smtplib.SMTPAuthenticationError(535, b"nee")
+
+    def send_message(self, m):
+        NepSMTP.verzonden.append(m)
+
+
+def mail_setup(c, monkeypatch):
+    import smtplib
+    NepSMTP.verzonden, NepSMTP.fout = [], None
+    monkeypatch.setattr(smtplib, "SMTP", NepSMTP)
+    c.get("/setup")
+    post(c, "/setup", {"naam": "admin", "wachtwoord": "langwachtwoord1", "email": "admin@voorbeeld.nl"}, "/setup")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+
+
+MAILFORM = {"host": "mail.test", "poort": "587", "beveiliging": "starttls", "gebruiker": "u", "wachtwoord": "w",
+            "van": "noreply@voorbeeld.nl", "publieke_url": "https://portaal.voorbeeld.nl"}
+
+
+def test_wachtwoord_vergeten_flow(client, monkeypatch):
+    c = client
+    mail_setup(c, monkeypatch)
+    post(c, "/logout", tokenurl="/beheer")
+    assert c.get("/wachtwoord-vergeten").status_code == 404  # nog geen mail ingesteld
+    assert "vergeten" not in c.get("/login").get_data(as_text=True)
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    post(c, "/beheer/mail", MAILFORM, "/beheer")
+    post(c, "/logout", tokenurl="/beheer")
+    assert "Wachtwoord vergeten?" in c.get("/login").get_data(as_text=True)
+    # onbekend adres: zelfde antwoord, geen mail
+    r = post(c, "/wachtwoord-vergeten", {"email": "niemand@voorbeeld.nl"}, "/wachtwoord-vergeten")
+    assert "Als dit e-mailadres" in r.get_data(as_text=True) and not NepSMTP.verzonden
+    r = post(c, "/wachtwoord-vergeten", {"email": "ADMIN@voorbeeld.nl"}, "/wachtwoord-vergeten")
+    assert "Als dit e-mailadres" in r.get_data(as_text=True) and len(NepSMTP.verzonden) == 1
+    tekst = NepSMTP.verzonden[0].get_content()
+    link = re.search(r"https://portaal\.voorbeeld\.nl(/wachtwoord-herstel/[\w-]+)", tekst).group(1)  # vaste, geconfigureerde host
+    assert c.get(link).status_code == 200
+    assert "Minimaal" in post(c, link, {"nieuw": "kort", "nieuw2": "kort"}, link, follow_redirects=True).get_data(as_text=True)
+    post(c, link, {"nieuw": "herstelwachtwoord1", "nieuw2": "herstelwachtwoord1"}, link)
+    assert c.get(link).status_code == 410  # token is één keer bruikbaar
+    post(c, "/login", {"naam": "admin", "wachtwoord": "herstelwachtwoord1"})
+    assert c.get("/beheer").status_code == 200
+
+
+def test_herstel_token_verloopt_en_ratelimit(client, monkeypatch):
+    import sqlite3
+    c = client
+    mail_setup(c, monkeypatch)
+    post(c, "/beheer/mail", MAILFORM, "/beheer")
+    post(c, "/logout", tokenurl="/beheer")
+    post(c, "/wachtwoord-vergeten", {"email": "admin@voorbeeld.nl"}, "/wachtwoord-vergeten")
+    link = re.search(r"(/wachtwoord-herstel/[\w-]+)", NepSMTP.verzonden[0].get_content()).group(1)
+    with sqlite3.connect(c.application.config["DATABASE"]) as d:
+        d.execute("UPDATE herstel_token SET verloopt=1")
+    assert c.get(link).status_code == 410
+    for _ in range(6):
+        r = post(c, "/wachtwoord-vergeten", {"email": "admin@voorbeeld.nl"}, "/wachtwoord-vergeten")
+    assert r.status_code == 429
+
+
+def test_testmail_en_fouten(client, monkeypatch):
+    c = client
+    mail_setup(c, monkeypatch)
+    r = post(c, "/beheer/mail", dict(MAILFORM, testmail="1"), "/beheer", follow_redirects=True)
+    assert "Testmail verstuurd naar admin@voorbeeld.nl" in r.get_data(as_text=True)
+    NepSMTP.fout = True
+    r = post(c, "/beheer/mail", dict(MAILFORM, testmail="1"), "/beheer", follow_redirects=True)
+    assert "controleer gebruiker en wachtwoord" in r.get_data(as_text=True)
+    r = post(c, "/beheer/mail", dict(MAILFORM, poort="99999"), "/beheer", follow_redirects=True)
+    assert "Controleer de mailinstellingen" in r.get_data(as_text=True)
+    # wachtwoord blijft behouden als het veld leeg is
+    post(c, "/beheer/mail", dict(MAILFORM, wachtwoord=""), "/beheer")
+    assert "ingesteld – leeg laten" in c.get("/beheer").get_data(as_text=True)

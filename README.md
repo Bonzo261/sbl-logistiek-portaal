@@ -22,7 +22,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 - Rollen: **beheerder**, **coördinator**, **chauffeur** (gekoppeld aan één route)
 - Tweestapsverificatie (TOTP, met QR-code) is verplicht voor beheerder en coördinator; 8 eenmalige herstelcodes
 - Blokkade na 10 mislukte inlogpogingen in 15 minuten, CSRF-bescherming, beveiligde cookies
-- Wachtwoord wijzigen door gebruiker zelf; reset door beheerder
+- Wachtwoord wijzigen door gebruiker zelf; reset door beheerder; "wachtwoord vergeten" per e-mail (link een uur geldig, één keer bruikbaar; 2FA blijft gelden)
 
 ## Installatie
 ### Docker (aanbevolen)
@@ -67,6 +67,9 @@ Om te ontwikkelen: `flask --app wsgi run`.
 | `SBL_TIJDZONE` | `Europe/Amsterdam` | Tijdzone voor tijden en bewaking |
 | `SBL_SECRET_KEY` | automatisch | Sleutel voor sessies; standaard gegenereerd en in de database bewaard |
 | `SBL_BEWAKING` | `1` | `0` = achtergrondbewaking van de gateway uitzetten |
+
+## E-mail (wachtwoord vergeten)
+Onder *Beheer → E-mail* stel je een SMTP-server in: server, poort, beveiliging (STARTTLS/SSL/geen), optioneel gebruiker en wachtwoord, afzenderadres en het webadres van de site (dat komt in de herstellink; het wordt bewust niet uit het verzoek afgeleid). Werkt met elke aanbieder: een postvak van je hosting, Microsoft 365, Google Workspace, een mailservice of de mailrelay van de gemeente. Met *Opslaan en testmail* controleer je de instellingen. Zonder mailinstellingen is er geen "wachtwoord vergeten"; de beheerder reset dan wachtwoorden. Het SMTP-wachtwoord staat in de database en dus in back-ups; wie dat liever niet wil, gebruikt de omgevingsvariabelen `SBL_SMTP_HOST`, `SBL_SMTP_POORT`, `SBL_SMTP_BEVEILIGING`, `SBL_SMTP_GEBRUIKER`, `SBL_SMTP_WACHTWOORD`, `SBL_SMTP_VAN` en `SBL_PUBLIEKE_URL` (die gaan voor op de instellingen in het scherm).
 
 ## Sms-forwarder koppelen
 Stel in de forwarder een **POST**-webhook in naar de URL onder *Beheer* (`/api/sms?sleutel=…`). De tekst mag in het veld `message`, `text`, `body`, `tekst` of `content` staan, als formulier of JSON; alleen het stembureaunummer is nodig. Voor de bewaking: laat de forwarder regelmatig (GET of POST) `/api/heartbeat?sleutel=…` aanroepen. Na de ingestelde tijd zonder ping (standaard 600 seconden) volgt een storingsmelding. Vul een meldings-URL in (bijv. een geheime ntfy-topic) voor een push naar de telefoon. De sleutel kun je onder *Beheer* vernieuwen.
