@@ -4,7 +4,11 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 
 ## [Niet uitgebracht]
 
+> Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
+
 ### Toegevoegd
+- Automatische dagelijkse back-up (vanaf 03:00) met bewaartermijn, lijst, download en herstel vanuit het scherm; mislukte back-ups worden gemeld
+- Sessies vervallen bij wachtwoordwijziging/-reset en 2FA-reset; knop "Uitloggen op alle andere apparaten"
 - "Wachtwoord vergeten" per e-mail via een instelbare SMTP-server (*Beheer → E-mail*, met testmail); herstellink een uur geldig en eenmalig, begrensd aantal aanvragen, 2FA blijft gelden
 - E-mailadres per gebruiker (bij installatie, aanmaken, op de accountpagina en door de beheerder; uniek, kleine letters)
 - Lijst met tijdelijke wachtwoorden downloaden als Excel (route, gebruikersnaam, wachtwoord, inlog-URL)

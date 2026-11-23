@@ -36,7 +36,8 @@ def migreer(c):
     for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0"),
                      ("herstel", "TEXT NOT NULL DEFAULT '[]'"),
                      ("moet_wijzigen", "INTEGER NOT NULL DEFAULT 0"),
-                     ("email", "TEXT NOT NULL DEFAULT ''")):
+                     ("email", "TEXT NOT NULL DEFAULT ''"),
+                     ("sessie_versie", "INTEGER NOT NULL DEFAULT 0")):
         if kol not in kolommen:
             c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
     c.commit()
@@ -118,8 +119,9 @@ def create_app(config=None):
         g.gebruiker = None
         if session.get("uid"):
             g.gebruiker = db().execute("SELECT * FROM gebruiker WHERE id=?", (session["uid"],)).fetchone()
-            if not g.gebruiker:
-                session.clear()
+            if not g.gebruiker or session.get("sv") != g.gebruiker["sessie_versie"]:
+                session.clear()  # gebruiker weg, of wachtwoord/2FA gewijzigd: sessie is niet meer geldig
+                g.gebruiker = None
             elif (g.gebruiker["moet_wijzigen"]
                   and request.endpoint not in ("wachtwoord_verplicht", "wachtwoord_wijzigen", "logout", "static")):
                 return redirect(url_for("wachtwoord_verplicht"))
@@ -188,7 +190,7 @@ def create_app(config=None):
         return render_template("setup.html")
 
     def voltooi_login(u, nxt=""):
-        session["uid"], session["naam"] = u["id"], u["naam"]
+        session["uid"], session["naam"], session["sv"] = u["id"], u["naam"], u["sessie_versie"]
         audit("inloggen")
         return redirect(nxt or url_for("start"))
 
@@ -292,8 +294,9 @@ def create_app(config=None):
         elif f["nieuw"] == f.get("huidig"):
             flash("Kies een ander wachtwoord dan het huidige.")
         else:
-            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0 WHERE id=?",
+            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0, sessie_versie=sessie_versie+1 WHERE id=?",
                          (generate_password_hash(f["nieuw"]), g.gebruiker["id"]))
+            session["sv"] = db().execute("SELECT sessie_versie FROM gebruiker WHERE id=?", (g.gebruiker["id"],)).fetchone()[0]
             audit("wachtwoord gewijzigd")
             flash("Wachtwoord gewijzigd.")
             return redirect(url_for("start"))
@@ -305,6 +308,16 @@ def create_app(config=None):
             return redirect(url_for("login"))
         return render_template("wachtwoord_verplicht.html")
 
+    @app.post("/account/uitloggen-elders")
+    def uitloggen_elders():
+        if not g.gebruiker:
+            abort(403)
+        db().execute("UPDATE gebruiker SET sessie_versie=sessie_versie+1 WHERE id=?", (g.gebruiker["id"],))
+        session["sv"] = db().execute("SELECT sessie_versie FROM gebruiker WHERE id=?", (g.gebruiker["id"],)).fetchone()[0]
+        audit("uitgelogd op andere apparaten")
+        flash("Je bent op alle andere apparaten uitgelogd.")
+        return redirect(url_for("account"))
+
     @app.post("/beheer/gebruikers/<int:uid>/wachtwoord")
     @rol_vereist("beheerder")
     def gebruiker_wachtwoord(uid):
@@ -312,7 +325,7 @@ def create_app(config=None):
         if len(nieuw) < 10:
             flash("Wachtwoord moet minimaal 10 tekens zijn.")
         else:
-            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1 WHERE id=?", (generate_password_hash(nieuw), uid))
+            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1, sessie_versie=sessie_versie+1 WHERE id=?", (generate_password_hash(nieuw), uid))
             audit(f"wachtwoord gereset voor gebruiker-id {uid}")
             flash("Wachtwoord ingesteld.")
         return redirect(url_for("beheer_gebruikers"))
@@ -320,7 +333,7 @@ def create_app(config=None):
     @app.post("/beheer/gebruikers/<int:uid>/reset2fa")
     @rol_vereist("beheerder")
     def gebruiker_reset2fa(uid):
-        db().execute("UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0 WHERE id=?", (uid,))
+        db().execute("UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0, herstel='[]', sessie_versie=sessie_versie+1 WHERE id=?", (uid,))
         audit(f"2fa gereset voor gebruiker-id {uid}")
         flash("2FA gereset; de gebruiker stelt het bij de volgende keer opnieuw in.")
         return redirect(url_for("beheer_gebruikers"))
@@ -437,6 +450,10 @@ def create_app(config=None):
                     bewaak_gateway()
                 except Exception as e:
                     app.logger.warning("Bewaking fout: %s", e)
+                try:
+                    app.auto_backup()
+                except Exception as e:
+                    app.logger.warning("Back-up fout: %s", e)
         threading.Thread(target=lus, daemon=True).start()
 
     if not app.config.get("TESTING") and os.environ.get("SBL_BEWAKING", "1") == "1":
@@ -714,24 +731,24 @@ def create_app(config=None):
             uit = []
             for u in gekozen:
                 ww = tijdelijk_wachtwoord()
-                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1 WHERE id=?", (generate_password_hash(ww), u["id"]))
+                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1, sessie_versie=sessie_versie+1 WHERE id=?", (generate_password_hash(ww), u["id"]))
                 uit.append((u["naam"], u["route_nummer"], ww))
             audit(f"selectie: {len(uit)} wachtwoorden opnieuw ingesteld")
             return (render_template("bulk.html", routes=routes(), resultaat=uit, overgeslagen=[],
                                     melding=f"{len(uit)} nieuwe tijdelijke wachtwoorden ingesteld."),
                     200, {"Cache-Control": "no-store"})
         if actie == "wijzig_verplicht":
-            db().execute(f"UPDATE gebruiker SET moet_wijzigen=1 WHERE id IN ({marks})", ids)
+            db().execute(f"UPDATE gebruiker SET moet_wijzigen=1, sessie_versie=sessie_versie+1 WHERE id IN ({marks})", ids)
             flash(f"{len(ids)} gebruiker(s) moeten hun wachtwoord wijzigen bij de volgende login.")
         elif actie == "reset2fa":
-            db().execute(f"UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0, herstel='[]' WHERE id IN ({marks})", ids)
+            db().execute(f"UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0, herstel='[]', sessie_versie=sessie_versie+1 WHERE id IN ({marks})", ids)
             flash(f"2FA gereset voor {len(ids)} gebruiker(s).")
         elif actie == "route":
             rid = request.form.get("route_id", type=int)
             if not db().execute("SELECT 1 FROM route WHERE id=?", (rid,)).fetchone():
                 flash("Kies een route.")
                 return redirect(url_for("beheer_gebruikers"))
-            n = db().execute(f"UPDATE gebruiker SET route_id=? WHERE rol='chauffeur' AND id IN ({marks})", [rid] + ids).rowcount
+            n = db().execute(f"UPDATE gebruiker SET route_id=?, sessie_versie=sessie_versie+1 WHERE rol='chauffeur' AND id IN ({marks})", [rid] + ids).rowcount
             flash(f"Route gewijzigd voor {n} chauffeur(s); anderen zijn overgeslagen.")
         elif actie == "verwijder":
             beheerders_over = db().execute(
@@ -814,10 +831,100 @@ def create_app(config=None):
             audit(f"gebruiker-id {uid} verwijderd")
         return redirect(url_for("beheer_gebruikers"))
 
+    # ---------- back-up ----------
+    def backup_map():
+        m = os.environ.get("SBL_BACKUP_DIR") or os.path.join(os.path.dirname(os.path.abspath(app.config["DATABASE"])), "backups")
+        os.makedirs(m, mode=0o700, exist_ok=True)
+        return m
+
+    BACKUPNAAM = re.compile(r"sbl-auto-\d{8}-\d{6}\.db")
+
+    def maak_backup(doelpad):
+        """Consistente kopie van de database (veilig tijdens gebruik) met bestandsrechten 0600."""
+        tmp = doelpad + ".tmp"
+        bron = sqlite3.connect(app.config["DATABASE"], timeout=30)
+        doel = sqlite3.connect(tmp)
+        try:
+            bron.backup(doel)
+        finally:
+            doel.close()
+            bron.close()
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, doelpad)
+
+    def backups_lijst():
+        m = backup_map()
+        uit = []
+        for n in sorted(os.listdir(m), reverse=True):
+            if BACKUPNAAM.fullmatch(n):
+                st = os.stat(os.path.join(m, n))
+                uit.append({"naam": n, "grootte": st.st_size, "tijd": datetime.fromtimestamp(st.st_mtime, ZoneInfo(app.config["TIJDZONE"])).strftime("%Y-%m-%d %H:%M")})
+        return uit
+
+    def auto_backup(forceer=False):
+        """Maakt hooguit één automatische back-up per dag (vanaf 03:00) en ruimt oude op. Veilig bij meerdere workers."""
+        with sqlite3.connect(app.config["DATABASE"], timeout=30) as c:
+            def inst(k, d=""):
+                r = c.execute("SELECT value FROM instelling WHERE key=?", (k,)).fetchone()
+                return r[0] if r else d
+            if not forceer and inst("backup_auto", "1") != "1":
+                return None
+            tz = ZoneInfo(app.config["TIJDZONE"])
+            nu_dt = datetime.now(tz)
+            laatste = inst("laatste_backup")
+            if not forceer and laatste:
+                if laatste[:10] >= nu_dt.strftime("%Y-%m-%d") or nu_dt.hour < 3:
+                    return None
+            c.execute("INSERT OR IGNORE INTO instelling VALUES ('laatste_backup','')")
+            if not c.execute("UPDATE instelling SET value=? WHERE key='laatste_backup' AND value=?",
+                             (nu_dt.strftime("%Y-%m-%d %H:%M:%S"), laatste)).rowcount:
+                return None  # een andere worker was ons voor
+            c.commit()
+            bewaar = max(1, int(inst("backup_bewaar", "14")))
+        naam = "sbl-auto-" + nu_dt.strftime("%Y%m%d-%H%M%S") + ".db"
+        try:
+            maak_backup(os.path.join(backup_map(), naam))
+            for oud in backups_lijst()[bewaar:]:
+                os.remove(os.path.join(backup_map(), oud["naam"]))
+            fout = ""
+        except Exception as e:
+            fout = f"{type(e).__name__}: {e}"
+            app.logger.warning("Automatische back-up mislukt: %s", e)
+        with sqlite3.connect(app.config["DATABASE"], timeout=30) as c:
+            c.execute("INSERT INTO instelling VALUES ('backup_fout',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (fout,))
+            c.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)",
+                      (nu(app), None, "automatische back-up " + ("mislukt: " + fout if fout else naam)))
+        return None if fout else naam
+
+    app.auto_backup = auto_backup
+
     @app.get("/beheer/backup")
     @rol_vereist("beheerder")
     def beheer_backup_pagina():
-        return render_template("backup.html")
+        return render_template("backup.html", lijst=backups_lijst(), map=backup_map(),
+                               auto=instelling("backup_auto", "1") == "1", bewaar=instelling("backup_bewaar", "14"),
+                               laatste=instelling("laatste_backup"), fout=instelling("backup_fout"))
+
+    @app.post("/beheer/backup/instellingen")
+    @rol_vereist("beheerder")
+    def backup_instellingen():
+        n = request.form.get("bewaar", type=int)
+        if n is None or not 1 <= n <= 365:
+            flash("Kies een aantal tussen 1 en 365 back-ups om te bewaren.")
+        else:
+            zet_instelling("backup_auto", "1" if request.form.get("auto") else "0")
+            zet_instelling("backup_bewaar", n)
+            audit("back-upinstellingen gewijzigd")
+            flash("Back-upinstellingen opgeslagen.")
+        return redirect(url_for("beheer_backup_pagina"))
+
+    @app.post("/beheer/backup/nu")
+    @rol_vereist("beheerder")
+    def backup_nu():
+        db().commit()
+        naam = auto_backup(forceer=True)
+        flash(f"Back-up gemaakt: {naam}" if naam else "Back-up maken is mislukt; zie het logboek.")
+        return redirect(url_for("beheer_backup_pagina"))
 
     @app.post("/beheer/backup/download")
     @rol_vereist("beheerder")
@@ -827,11 +934,7 @@ def create_app(config=None):
         db().commit()
         fd, pad = tempfile.mkstemp(suffix=".db")
         os.close(fd)
-        bron = sqlite3.connect(app.config["DATABASE"])
-        doel = sqlite3.connect(pad)
-        bron.backup(doel)
-        doel.close()
-        bron.close()
+        maak_backup(pad)
         audit("back-up gedownload")
         db().commit()
         naam = "sbl-backup-" + nu(app).replace(" ", "_").replace(":", "") + ".db"
@@ -839,43 +942,66 @@ def create_app(config=None):
         resp.call_on_close(lambda: os.path.exists(pad) and os.remove(pad))
         return resp
 
+    @app.post("/beheer/backup/bestand/<naam>")
+    @rol_vereist("beheerder")
+    def backup_bestand_download(naam):
+        from flask import send_file
+        if not BACKUPNAAM.fullmatch(naam) or not os.path.exists(os.path.join(backup_map(), naam)):
+            abort(404)
+        audit(f"back-upbestand gedownload: {naam}")
+        return send_file(os.path.join(backup_map(), naam), as_attachment=True, download_name=naam)
+
+    def herstel_uit_pad(pad):
+        """Controleert een back-upbestand en vervangt de huidige database. Geeft een foutmelding of None."""
+        bron = sqlite3.connect(pad)
+        try:
+            ok = bron.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            tabellen = {r[0] for r in bron.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            ok = ok and {"route", "stembureau", "bericht", "gebruiker", "instelling"} <= tabellen
+            ok = ok and bron.execute("SELECT COUNT(*) FROM gebruiker WHERE rol='beheerder'").fetchone()[0] > 0
+        except sqlite3.DatabaseError:
+            ok = False
+        if not ok:
+            bron.close()
+            return "Dit is geen geldig back-upbestand (of er staat geen beheerder in)."
+        db().commit()
+        doel = sqlite3.connect(app.config["DATABASE"], timeout=30)
+        bron.backup(doel)
+        bron.close()
+        migreer(doel)
+        doel.execute("INSERT INTO instelling VALUES ('secret_key', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                     (app.config["SECRET_KEY"],))
+        doel.execute("UPDATE gebruiker SET sessie_versie=sessie_versie+1")  # alle sessies vervallen
+        doel.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)",
+                     (nu(app), session.get("naam"), "back-up hersteld"))
+        doel.commit()
+        doel.close()
+        return None
+
     @app.post("/beheer/backup/herstel")
     @rol_vereist("beheerder")
     def backup_herstel():
         import tempfile
         f = request.files.get("bestand")
-        if request.form.get("bevestig", "").strip().upper() != "HERSTEL" or not f:
+        opgeslagen = request.form.get("opgeslagen", "")
+        if request.form.get("bevestig", "").strip().upper() != "HERSTEL" or not (f or opgeslagen):
             flash("Kies een bestand en typ HERSTEL om te bevestigen.")
             return redirect(url_for("beheer_backup_pagina"))
-        fd, pad = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-        try:
-            f.save(pad)
-            bron = sqlite3.connect(pad)
+        if opgeslagen:
+            if not BACKUPNAAM.fullmatch(opgeslagen) or not os.path.exists(os.path.join(backup_map(), opgeslagen)):
+                abort(404)
+            fout = herstel_uit_pad(os.path.join(backup_map(), opgeslagen))
+        else:
+            fd, pad = tempfile.mkstemp(suffix=".db")
+            os.close(fd)
             try:
-                ok = bron.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-                tabellen = {r[0] for r in bron.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-                ok = ok and {"route", "stembureau", "bericht", "gebruiker", "instelling"} <= tabellen
-                ok = ok and bron.execute("SELECT COUNT(*) FROM gebruiker WHERE rol='beheerder'").fetchone()[0] > 0
-            except sqlite3.DatabaseError:
-                ok = False
-            if not ok:
-                bron.close()
-                flash("Dit is geen geldig back-upbestand (of er staat geen beheerder in).")
-                return redirect(url_for("beheer_backup_pagina"))
-            db().commit()
-            doel = sqlite3.connect(app.config["DATABASE"], timeout=30)
-            bron.backup(doel)
-            bron.close()
-            migreer(doel)
-            doel.execute("INSERT INTO instelling VALUES ('secret_key', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                         (app.config["SECRET_KEY"],))
-            doel.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)",
-                         (nu(app), session.get("naam"), "back-up hersteld"))
-            doel.commit()
-            doel.close()
-        finally:
-            os.remove(pad)
+                f.save(pad)
+                fout = herstel_uit_pad(pad)
+            finally:
+                os.remove(pad)
+        if fout:
+            flash(fout)
+            return redirect(url_for("beheer_backup_pagina"))
         session.clear()
         flash("Back-up hersteld. Log opnieuw in.")
         return redirect(url_for("login"))
@@ -955,7 +1081,7 @@ def create_app(config=None):
             if len(nieuw) < 10 or nieuw != request.form.get("nieuw2"):
                 flash("Minimaal 10 tekens, en beide velden moeten gelijk zijn.")
             else:
-                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0 WHERE id=?",
+                db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0, sessie_versie=sessie_versie+1 WHERE id=?",
                              (generate_password_hash(nieuw), rij["gebruiker_id"]))
                 db().execute("DELETE FROM herstel_token WHERE gebruiker_id=?", (rij["gebruiker_id"],))
                 db().execute("DELETE FROM login_poging WHERE sleutel=(SELECT 'n:' || lower(naam) FROM gebruiker WHERE id=?)",

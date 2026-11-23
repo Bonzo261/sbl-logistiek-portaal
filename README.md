@@ -14,7 +14,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 **Beheer**
 - Aantal routes instellen; stembureaus handmatig beheren of importeren uit `.csv`, `.xlsx` of `.ods` (slepen-en-neerzetten, met voorbeeld vóór het opslaan)
 - Gebruikers beheren, ook in bulk: één chauffeursaccount per route (`route1`, `route2`, …) met een tijdelijk wachtwoord dat bij de eerste login gewijzigd moet worden; acties op een selectie gebruikers (nieuw tijdelijk wachtwoord, 2FA resetten, route wijzigen, verwijderen)
-- Back-up downloaden en herstellen (*Beheer → Back-up*)
+- Back-up: automatisch elke nacht (vanaf 03:00) in de map `backups/` naast de database, met instelbaar aantal te bewaren back-ups; handmatig downloaden en herstellen (*Beheer → Back-up*)
 - Logboek van acties
 
 **Bewaking en beveiliging**
@@ -22,7 +22,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 - Rollen: **beheerder**, **coördinator**, **chauffeur** (gekoppeld aan één route)
 - Tweestapsverificatie (TOTP, met QR-code) is verplicht voor beheerder en coördinator; 8 eenmalige herstelcodes
 - Blokkade na 10 mislukte inlogpogingen in 15 minuten, CSRF-bescherming, beveiligde cookies
-- Wachtwoord wijzigen door gebruiker zelf; reset door beheerder; "wachtwoord vergeten" per e-mail (link een uur geldig, één keer bruikbaar; 2FA blijft gelden)
+- Sessies vervallen automatisch bij een wachtwoordwijziging, -reset of 2FA-reset, en je kunt jezelf op andere apparaten uitloggen. Wachtwoord wijzigen door gebruiker zelf; reset door beheerder; "wachtwoord vergeten" per e-mail (link een uur geldig, één keer bruikbaar; 2FA blijft gelden)
 
 ## Installatie
 ### Docker (aanbevolen)
@@ -54,7 +54,7 @@ Om te ontwikkelen: `flask --app wsgi run`.
   ProxyPass / http://127.0.0.1:8000/
   ProxyPassReverse / http://127.0.0.1:8000/
   ```
-- Bewaar de data in een volume (`/data`) en maak regelmatig een back-up (*Beheer → Back-up*). Een back-up bevat wachtwoord-hashes en 2FA-sleutels: bewaar hem veilig.
+- Bewaar de data in een volume (`/data`). De app maakt elke nacht een back-up in `/data/backups` (te wijzigen met `SBL_BACKUP_DIR`), maar die staat op dezelfde server: download of kopieer regelmatig een back-up naar een andere plek (*Beheer → Back-up*). Een back-up bevat wachtwoord-hashes en 2FA-sleutels: bewaar hem veilig.
 - Bijwerken: haal de nieuwste image op en maak de container opnieuw aan; het volume blijft behouden. Zie `CHANGELOG.md` voor wijzigingen.
 
 ### Instellingen (omgevingsvariabelen)
@@ -66,7 +66,8 @@ Om te ontwikkelen: `flask --app wsgi run`.
 | `SBL_2FA_VERPLICHT` | `1` | `0` = 2FA niet verplicht voor beheerder/coördinator |
 | `SBL_TIJDZONE` | `Europe/Amsterdam` | Tijdzone voor tijden en bewaking |
 | `SBL_SECRET_KEY` | automatisch | Sleutel voor sessies; standaard gegenereerd en in de database bewaard |
-| `SBL_BEWAKING` | `1` | `0` = achtergrondbewaking van de gateway uitzetten |
+| `SBL_BEWAKING` | `1` | `0` = achtergrondtaken (gateway-bewaking en automatische back-up) uitzetten |
+| `SBL_BACKUP_DIR` | `<map van database>/backups` | Map voor automatische back-ups |
 
 ## E-mail (wachtwoord vergeten)
 Onder *Beheer → E-mail* stel je een SMTP-server in: server, poort, beveiliging (STARTTLS/SSL/geen), optioneel gebruiker en wachtwoord, afzenderadres en het webadres van de site (dat komt in de herstellink; het wordt bewust niet uit het verzoek afgeleid). Werkt met elke aanbieder: een postvak van je hosting, Microsoft 365, Google Workspace, een mailservice of de mailrelay van de gemeente. Met *Opslaan en testmail* controleer je de instellingen. Zonder mailinstellingen is er geen "wachtwoord vergeten"; de beheerder reset dan wachtwoorden. Het SMTP-wachtwoord staat in de database en dus in back-ups; wie dat liever niet wil, gebruikt de omgevingsvariabelen `SBL_SMTP_HOST`, `SBL_SMTP_POORT`, `SBL_SMTP_BEVEILIGING`, `SBL_SMTP_GEBRUIKER`, `SBL_SMTP_WACHTWOORD`, `SBL_SMTP_VAN` en `SBL_PUBLIEKE_URL` (die gaan voor op de instellingen in het scherm).
@@ -88,7 +89,7 @@ python -m pytest
 De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom via pull requests; voeg een test toe en noteer de wijziging in `CHANGELOG.md`.
 
 ## Roadmap
-Automatisch printen (kiosk), optionele Epson ePOS-printer, dagelijkse automatische back-up, historie per verkiezing, overzichtsscherm, Postgres.
+Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, overzichtsscherm, Postgres.
 
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.
