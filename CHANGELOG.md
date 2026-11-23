@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Logo en favicon (StemBureauLogistiek) in de kop, op de inlog- en instelpagina, het overzichtsscherm en in de README
 - Melding voor chauffeurs bij een nieuwe opdracht op de routepagina: pop-up, geluid, trillen en het scherm blijft aan (aan/uit in *Beheer → Werkwijze*). Als een nog niet geaccepteerde opdracht naar een andere route wordt verplaatst, krijgt de oude route een oranje melding. De routepagina ververst nu zonder te herladen
 - Geluidssignaal bij een nieuw bericht in het portaal en op het overzichtsscherm (aan/uit in *Beheer → Werkwijze*); compacte geluidsknop (alleen icoon) in de kop, per apparaat aan/uit. Het portaal ververst nu zonder de pagina te herladen
 - Optionele acceptatie door de chauffeur (*Beheer → Werkwijze*): toegewezen opdrachten wachten op acceptatie en kunnen tot dat moment door de coördinator naar een andere route verplaatst worden; ook zichtbaar op het overzichtsscherm; waarschuwing (oranje/rood, instelbaar) als een opdracht te lang niet geaccepteerd is, in het portaal en op het overzichtsscherm

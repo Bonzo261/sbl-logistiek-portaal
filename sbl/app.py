@@ -159,6 +159,11 @@ def create_app(config=None):
     def routes():
         return db().execute("SELECT * FROM route ORDER BY nummer").fetchall()
 
+    @app.get("/favicon.ico")
+    def favicon():
+        from flask import send_from_directory
+        return send_from_directory(os.path.join(HIER, "static"), "favicon.ico", max_age=86400)
+
     # ---------- publiek ----------
     @app.get("/")
     def start():

@@ -2,9 +2,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block titel %}SBL Portaal{% endblock %}</title>
 <script src="{{ url_for('static', filename='geluid.js') }}"></script>
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="icon" href="{{ url_for('favicon') }}" sizes="48x48">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+<meta name="theme-color" content="#1d4ed8">
 <link rel="stylesheet" href="{{ url_for('static', filename='stijl.css') }}">
 {% block kop %}{% endblock %}</head><body>
-<header><strong>SBL Portaal</strong>
+<header><a class="merk" href="{{ url_for('start') }}"><img src="{{ url_for('static', filename='icon.svg') }}" width="28" height="28" alt=""><strong>SBL</strong><span class="ondertitel">StemBureauLogistiek</span></a>
 {% if gebruiker %}
  {% if gebruiker.rol != 'chauffeur' %}<a href="{{ url_for('portaal') }}">Portaal</a><a href="{{ url_for('routes_overzicht') }}">Routes</a><a href="{{ url_for('scherm') }}">Scherm</a>{% endif %}
  {% if gebruiker.rol == 'beheerder' %}<a href="{{ url_for('beheer') }}">Beheer</a>{% endif %}
