@@ -29,6 +29,27 @@ def nu(app=None):
     return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
+
+AUDIT_TYPES = ["Gateway", "Berichten", "Inloggen en account", "Gebruikers", "Stembureaus en routes", "Instellingen", "Back-up", "Overig"]
+_AUDIT_REGELS = [
+    ("Gateway", ("gateway",)),
+    ("Berichten", ("bericht ",)),
+    ("Back-up", ("back-up",)),
+    ("Gebruikers", ("gebruiker", "bulk:", "selectie:", "wachtwoordenlijst", "wachtwoord gereset", "2fa gereset", "e-mailadres")),
+    ("Inloggen en account", ("inloggen", "uitgelogd", "wachtwoord", "2fa", "herstelcode")),
+    ("Stembureaus en routes", ("stembureau", "import van", "aantal routes")),
+    ("Instellingen", ("sleutel", "acceptatie", "mailinstellingen", "scherm")),
+]
+
+
+def audit_type(actie):
+    """Leidt het type van een logboekregel af uit de tekst (de tabel zelf heeft geen typekolom)."""
+    a = (actie or "").lower()
+    for naam, woorden in _AUDIT_REGELS:
+        if any(w in a for w in woorden):
+            return naam
+    return "Overig"
+
 def migreer(c):
     """Maakt tabellen/kolommen aan; veilig om herhaald uit te voeren (ook na herstel van een oude back-up)."""
     c.executescript(open(os.path.join(HIER, "schema.sql")).read())
@@ -1351,7 +1372,16 @@ def create_app(config=None):
     @app.get("/beheer/audit")
     @rol_vereist("beheerder")
     def beheer_audit():
-        return render_template("audit.html", rows=db().execute("SELECT * FROM audit ORDER BY id DESC LIMIT 200").fetchall())
+        gekozen = request.args.get("type", "")
+        rows = []
+        for r in db().execute("SELECT * FROM audit ORDER BY id DESC LIMIT 5000"):
+            t = audit_type(r["actie"])
+            if gekozen and t != gekozen:
+                continue
+            rows.append({"tijd": r["tijd"], "gebruiker": r["gebruiker"], "actie": r["actie"], "type": t})
+            if len(rows) >= 200:
+                break
+        return render_template("audit.html", rows=rows, types=AUDIT_TYPES, gekozen=gekozen)
 
     @app.after_request
     def headers(resp):

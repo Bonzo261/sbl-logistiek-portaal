@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Logboek: filteren op type (gateway, berichten, inloggen en account, gebruikers, stembureaus en routes, instellingen, back-up)
 - Beheer: gateway-status (verbonden, storing of nog geen heartbeat) met tijdstip van laatste heartbeat en laatste sms
 - Routes-overzicht toont ook de stembureaunummers per stadium
 - Routes-overzicht toont per route de stadia: wacht op acceptatie (alleen als acceptatie aan staat), onderweg en klaar vandaag, plus het aantal nieuwe berichten zonder route

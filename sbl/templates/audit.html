@@ -1,2 +1,8 @@
 {% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p>
-<h1>Logboek</h1><table>{% for r in rows %}<tr><td>{{ r.tijd }}</td><td>{{ r.gebruiker }}</td><td>{{ r.actie }}</td></tr>{% endfor %}</table>{% endblock %}
+<h1>Logboek</h1>
+<form method="get" class="rij"><label>Type <select name="type" onchange="this.form.submit()">
+<option value="">Alle</option>{% for t in types %}<option value="{{ t }}"{{ ' selected' if t == gekozen }}>{{ t }}</option>{% endfor %}</select></label>
+<noscript><button>Filteren</button></noscript></form>
+<table><tr><th>Tijd</th><th>Gebruiker</th><th>Type</th><th>Actie</th></tr>
+{% for r in rows %}<tr><td>{{ r.tijd }}</td><td>{{ r.gebruiker or '' }}</td><td>{{ r.type }}</td><td>{{ r.actie }}</td></tr>{% else %}<tr><td colspan="4">Geen regels.</td></tr>{% endfor %}</table>
+<p class="klein">Laatste 200 regels{% if gekozen %} van type {{ gekozen }}{% endif %}.</p>{% endblock %}
