@@ -1,0 +1,9 @@
+{% extends "basis.html" %}
+{% block kop %}<meta http-equiv="refresh" content="20">{% endblock %}
+{% block inhoud %}<h1>Route {{ route.nummer }}</h1>
+{% for b in items %}<div class="kaart">
+ <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
+ <p class="rij"><a class="knop" href="tel:{{ b.telefoon|replace(' ','') }}">📞 Bel voorzitter stembureau-{{ b.sb_nummer }}</a>
+ <a class="knop grijs" href="https://www.google.com/maps/dir/?api=1&destination={{ b.adres|urlencode }}">Navigeer</a>
+ <form method="post" action="{{ url_for('bericht_klaar', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><button class="groen">Klaar</button></form></p>
+</div>{% else %}<p class="klein">Geen openstaande opdrachten.</p>{% endfor %}{% endblock %}

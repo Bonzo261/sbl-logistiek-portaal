@@ -1,0 +1,14 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block titel %}SBL Portaal{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='stijl.css') }}">
+{% block kop %}{% endblock %}</head><body>
+<header><strong>SBL Portaal</strong>
+{% if gebruiker %}
+ {% if gebruiker.rol != 'chauffeur' %}<a href="{{ url_for('portaal') }}">Portaal</a><a href="{{ url_for('routes_overzicht') }}">Routes</a>{% endif %}
+ {% if gebruiker.rol == 'beheerder' %}<a href="{{ url_for('beheer') }}">Beheer</a>{% endif %}
+ <span class="sp"></span><span class="klein">{{ gebruiker.naam }}</span>
+ <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Uitloggen</button></form>
+{% endif %}</header>
+<main>{% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+{% block inhoud %}{% endblock %}</main></body></html>

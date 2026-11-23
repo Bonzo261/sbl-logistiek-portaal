@@ -1,0 +1,28 @@
+{% extends "basis.html" %}
+{% block kop %}<meta http-equiv="refresh" content="20">{% endblock %}
+{% block inhoud %}
+{% if storing %}<div class="storing">⚠ Storing: de sms-gateway heeft zich al lang niet gemeld.</div>{% endif %}
+<h2>Nieuw ({{ nieuw|length }})</h2>
+{% for b in nieuw %}<div class="kaart">
+ {% if b.sb_nummer %}<strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
+ <span class="klein">Voorzitter: {{ b.telefoon }} · ontvangen {{ b.ontvangen[11:16] }}</span>
+ {% else %}<strong>Onbekend bericht: “{{ b.tekst }}”</strong><br><span class="klein">Geen stembureau herkend · {{ b.ontvangen[11:16] }}</span>{% endif %}
+ <form method="post" action="{{ url_for('bericht_route', bid=b.id) }}" class="rij">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  {% if b.advies %}<button class="groen" name="route_id" value="{{ b.advies }}">Advies: route {{ adviesnrs[b.advies] }}</button>{% endif %}
+  <select name="route_id">{% for r in routes %}<option value="{{ r.id }}">Route {{ r.nummer }}</option>{% endfor %}</select>
+  <button>Andere route</button>
+ </form>
+ <form method="post" action="{{ url_for('bericht_verwijder', bid=b.id) }}" onsubmit="return confirm('Verwijderen?')">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Verwijderen</button></form>
+</div>{% else %}<p class="klein">Geen nieuwe berichten.</p>{% endfor %}
+<h2>Onderweg ({{ onderweg|length }})</h2>
+{% for b in onderweg %}<div class="kaart rij">
+ <div><strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }}<br><span class="klein">{{ b.adres }}</span></div>
+ <span class="sp"></span>
+ <a class="knop grijs" href="{{ url_for('bericht_print', bid=b.id) }}" target="_blank">Print</a>
+ <form method="post" action="{{ url_for('bericht_klaar', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('portaal') }}"><button class="groen">Klaar</button></form>
+</div>{% else %}<p class="klein">Niets onderweg.</p>{% endfor %}
+<h2>Klaar (laatste 20)</h2>
+<table>{% for b in klaar %}<tr><td>{{ b.sb_nummer or b.tekst }}</td><td>{{ b.sb_naam }}</td><td>route {{ b.route_nummer }}</td><td>{{ b.klaar_op[11:16] }}</td></tr>{% endfor %}</table>
+{% endblock %}
