@@ -98,5 +98,5 @@ Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezi
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige tekst staat in `LICENSE`.
 
-## Logo
-Het logo en de favicon staan in `sbl/static/` (`logo.svg`, `logo-licht.svg` voor donkere achtergronden, `icon.svg`, `favicon.ico` en PNG-varianten) en vallen onder dezelfde licentie als de software. Het ontwerp: een stembiljet met vinkje dat in een stembus gaat.
+## Huisstijl
+Logo, kleuren en lettertype (Fira Sans, marine en oranje) staan beschreven in [`docs/HUISSTIJL.md`](docs/HUISSTIJL.md). Logo's en favicon staan in `sbl/static/` en vallen onder dezelfde licentie als de software; het lettertype heeft de SIL Open Font License (zie `sbl/static/fonts/`).
