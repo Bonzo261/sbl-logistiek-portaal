@@ -739,3 +739,15 @@ def test_routes_toont_stembureaunummers(client):
     con.execute("INSERT INTO bericht (stembureau_id, tekst, status, route_id, ontvangen, onderweg_op) VALUES (?, '77', 'onderweg', ?, '2026-01-01 10:00:00', '2026-01-01 10:01:00')", (sid, rid[0]))
     con.commit(); con.close()
     assert "(77)" in client.get("/routes").get_data(as_text=True)
+
+
+def test_logboek_filter(client):
+    from sbl.app import audit_type
+    assert audit_type("gateway-storing") == "Gateway"
+    assert audit_type("bericht 3 klaar") == "Berichten"
+    assert audit_type("wachtwoordenlijst gedownload (3 rijen)") == "Gebruikers"
+    assert audit_type("sms-sleutel vernieuwd") == "Instellingen"
+    assert audit_type("inloggen") == "Inloggen en account"
+    maak_admin(client)
+    t = client.get("/beheer/audit?type=Gateway").get_data(as_text=True)
+    assert "Gateway" in t and "inloggen" not in t.split("<table>")[1]
