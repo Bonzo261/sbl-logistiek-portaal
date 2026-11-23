@@ -280,3 +280,23 @@ def test_laatste_beheerder_niet_verwijderen(client):
     # admin (ikzelf) blijft altijd over; b2 mag dus weg
     post(c, "/beheer/gebruikers/selectie", {"actie": "verwijder", "uid": ids}, "/beheer/gebruikers")
     assert 'name="uid"' not in c.get("/beheer/gebruikers").get_data(as_text=True)
+
+
+def test_wachtwoorden_excel(client):
+    import html as _html
+    from openpyxl import load_workbook
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    r = post(c, "/beheer/gebruikers/bulk", {"voorvoegsel": "route", "route_id": ["1", "2"]}, "/beheer/gebruikers/bulk")
+    pagina = r.get_data(as_text=True)
+    data = _html.unescape(re.search(r'name="data" value="([^"]*)"', pagina).group(1))
+    x = post(c, "/beheer/gebruikers/wachtwoorden.xlsx", {"data": data}, "/beheer/gebruikers/bulk")
+    assert x.status_code == 200 and x.headers["Cache-Control"] == "no-store"
+    ws = load_workbook(io.BytesIO(x.data)).active
+    rijen = list(ws.iter_rows(values_only=True))
+    assert rijen[0][:3] == ("Route", "Gebruikersnaam", "Tijdelijk wachtwoord")
+    assert [r[1] for r in rijen[1:]] == ["route1", "route2"]
+    for r_, (naam, ww) in zip(rijen[1:], re.findall(r"<td>(route\d)</td><td><code>(\w{12})</code>", pagina)):
+        assert r_[2] == ww and r_[3].endswith("/login")
+    assert post(c, "/beheer/gebruikers/wachtwoorden.xlsx", {"data": "kapot"}, "/beheer/gebruikers/bulk").status_code == 400

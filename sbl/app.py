@@ -1,4 +1,5 @@
 """SBL Logistiek Portaal - kern van de webapp."""
+import io
 import json
 import os
 import secrets
@@ -702,6 +703,40 @@ def create_app(config=None):
             abort(400, "Onbekende actie")
         audit(f"selectie: {actie} voor {len(ids)} gebruiker(s)")
         return redirect(url_for("beheer_gebruikers"))
+
+    @app.post("/beheer/gebruikers/wachtwoorden.xlsx")
+    @rol_vereist("beheerder")
+    def wachtwoorden_excel():
+        from flask import send_file
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        try:
+            rijen = json.loads(request.form.get("data", "[]"))[:500]
+            rijen = [(str(n)[:80], "" if r is None else str(r)[:10], str(w)[:40]) for n, r, w in rijen]
+        except (ValueError, TypeError):
+            abort(400, "Ongeldige gegevens")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Tijdelijke wachtwoorden"
+        ws.append(["Route", "Gebruikersnaam", "Tijdelijk wachtwoord", "Inloggen op"])
+        for c in ws[1]:
+            c.font = Font(bold=True)
+        url = request.url_root.rstrip("/") + url_for("login")
+        for n, r, w in rijen:
+            ws.append([int(r) if r.isdigit() else r, n, w, url])
+        for kol, breedte in zip("ABCD", (8, 22, 24, 40)):
+            ws.column_dimensions[kol].width = breedte
+        # wachtwoorden als tekst, zodat Excel er niets van maakt
+        for rij in ws.iter_rows(min_row=2, min_col=3, max_col=3):
+            rij[0].number_format = "@"
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        audit(f"wachtwoordenlijst gedownload ({len(rijen)} rijen)")
+        resp = send_file(buf, as_attachment=True, download_name="tijdelijke-wachtwoorden.xlsx",
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.route("/beheer/gebruikers/bulk", methods=["GET", "POST"])
     @rol_vereist("beheerder")
