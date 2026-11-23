@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Beheer → Opruimen: na de verkiezing berichten, chauffeursaccounts, stembureaus, logboek en automatische back-ups wissen (met bevestiging en een back-up vooraf)
 - Beveiliging: Content-Security-Policy, Permissions-Policy, HSTS en `no-store` op alle pagina's; begrenzing van foute webhook-sleutels per IP-adres; document `docs/PRIVACY-EN-BEVEILIGING.md`
 - Fout opgelost: een sms met bijzondere cijfertekens (zoals ²) of een zeer lange reeks cijfers kon een serverfout geven; het stembureaunummer is nu het eerste getal in de sms
 - Routepagina: opdrachten onderweg staan op volgorde van acceptatie, met "Volgorde 1, 2, …" en het tijdstip van acceptatie

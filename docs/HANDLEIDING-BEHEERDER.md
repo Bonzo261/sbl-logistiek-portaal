@@ -45,13 +45,16 @@ Stel het aantal routes in. Een route die nog stembureaus of openstaande berichte
 - **Download** af en toe een back-up en bewaar die op een andere plek. Een back-up bevat wachtwoord-hashes en 2FA-sleutels, dus bewaar hem veilig.
 - **Herstellen** vervangt alle gegevens door die uit het bestand. Doe dat alleen bewust.
 
+## Opruimen na de verkiezing
+*Beheer → Opruimen*: wis berichten, chauffeursaccounts, stembureaus (adressen en telefoonnummers), het logboek en de automatische back-ups. Je kiest zelf wat en typt ter bevestiging OPRUIMEN. Wissen kan niet ongedaan worden gemaakt. Als je de back-ups niet mee wist, maakt de app eerst een back-up; die bevat dan nog de gegevens en moet je later zelf verwijderen. Gedownloade back-ups buiten de server ruim je zelf op. Beheerders- en coördinatoraccounts blijven bestaan.
+
 ## Logboek
 *Beheer → Logboek* toont de laatste 200 acties (inloggen, wachtwoorden, toewijzingen, gateway-storingen en herstel, instellingen). Filter op type met de keuzelijst bovenaan. Handig om storingen en wijzigingen na te gaan.
 
 ## Dagelijks en tijdens de verkiezing
 Vóór de verkiezingsdag: stembureaus gecontroleerd, accounts uitgedeeld, testsms gestuurd, gateway "verbonden", back-up gedownload.
 Op de dag: houd het overzichtsscherm of **Beheer** in de gaten voor storingen; controleer de gateway-telefoon bij een storingsmelding (stroom, bereik, app actief).
-Daarna: back-up downloaden, tijdelijke accounts opruimen.
+Daarna: eventueel een back-up downloaden voor je archief, daarna *Beheer → Opruimen*.
 
 ## Problemen
 | Probleem | Oplossing |

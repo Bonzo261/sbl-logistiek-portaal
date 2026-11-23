@@ -30,7 +30,7 @@ De app gebruikt geen externe diensten, trackers of lettertype-servers. Verkeer n
 1. **HTTPS is verplicht.** Zet `SBL_HTTPS=1` en `SBL_PROXY=1` achter een proxy.
 2. **De webhook-sleutel staat in de URL.** Die kan terechtkomen in toegangslogs van de proxy. De app accepteert de sleutel ook in de header `X-SBL-Sleutel`; gebruik die als je forwarder dat kan. Gebruik een gegenereerde sleutel, geen zelfgekozen testsleutel.
 3. **Back-ups** bevatten wachtwoord-hashes, 2FA-sleutels en alle stembureau- en berichtgegevens. Bewaar ze versleuteld of op een afgeschermde plek en ruim oude kopieën op.
-4. **Bewaartermijn.** Berichten, het logboek en accounts blijven bewaard tot je ze verwijdert. Wis na de verkiezing de berichten, tijdelijke chauffeursaccounts en oude back-ups. Op de wensenlijst staat een knop om dit gemakkelijk te doen.
+4. **Bewaartermijn.** Berichten, het logboek en accounts blijven bewaard tot je ze verwijdert. Wis na de verkiezing de berichten, tijdelijke chauffeursaccounts, stembureaugegevens en oude back-ups met *Beheer → Opruimen*. Back-ups die je naar je eigen computer hebt gedownload, ruim je zelf op.
 5. **Het sms-nummer van de gateway** en de gateway-telefoon bevatten ook persoonsgegevens (berichten). Beveilig de telefoon met een schermvergrendeling en wis berichten na afloop.
 6. **Meldings-URL**: een ntfy-topic is voor iedereen leesbaar die de naam weet. Kies een lange, willekeurige naam of host je eigen ntfy-server.
 7. **Updates**: werk regelmatig bij naar de nieuwste image; zie `CHANGELOG.md`.
