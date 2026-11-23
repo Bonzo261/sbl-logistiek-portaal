@@ -579,7 +579,22 @@ def create_app(config=None):
         items = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                 WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.onderweg_op""", (route_id,)).fetchall()
-        return render_template("route.html", route=route, items=items)
+        return render_template("route.html", route=route, items=items,
+                               melding=instelling("melding_chauffeur", "1") == "1")
+
+    @app.get("/route/<int:route_id>/status.json")
+    @rol_vereist("beheerder", "coordinator", "chauffeur")
+    def route_status(route_id):
+        if g.gebruiker["rol"] == "chauffeur" and g.gebruiker["route_id"] != route_id:
+            abort(403)
+        rijen = db().execute("""SELECT b.id, b.status, s.nummer, s.naam FROM bericht b
+                                LEFT JOIN stembureau s ON s.id=b.stembureau_id
+                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.id""", (route_id,)).fetchall()
+        handtekening = hashlib.sha1(";".join(f"{r['id']}:{r['status']}" for r in rijen).encode()).hexdigest()
+        resp = jsonify(handtekening=handtekening, melding=instelling("melding_chauffeur", "1") == "1",
+                       items=[{"id": r["id"], "nr": r["nummer"], "naam": r["naam"] or "", "status": r["status"]} for r in rijen])
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.get("/routes")
     @rol_vereist("beheerder", "coordinator")
@@ -598,7 +613,8 @@ def create_app(config=None):
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
-                               accepteren=instelling("accepteren_verplicht", "0") == "1", geluid=instelling("geluid_nieuw", "1") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
+                               accepteren=instelling("accepteren_verplicht", "0") == "1", geluid=instelling("geluid_nieuw", "1") == "1",
+                               melding_chauffeur=instelling("melding_chauffeur", "1") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
                                scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
     @app.post("/beheer/routes")
@@ -1099,7 +1115,9 @@ def create_app(config=None):
             routes_uit.append({"nummer": r["nummer"], "open": items, "langste": langste, "niveau": niveau})
         vandaag = nu(app)[:10]
         klaar = db().execute("SELECT COUNT(*) c FROM bericht WHERE status='klaar' AND substr(klaar_op,1,10)=?", (vandaag,)).fetchone()["c"]
-        return {"tijd": nu(app)[11:16], "storing": gateway_storing(), "nieuw": nieuw, "routes": routes_uit,
+        nieuwste = db().execute("SELECT COALESCE(MAX(id),0) m FROM bericht").fetchone()["m"]
+        return {"tijd": nu(app)[11:16], "storing": gateway_storing(), "nieuw": nieuw, "nieuwste": nieuwste,
+                "geluid": instelling("geluid_nieuw", "1") == "1", "routes": routes_uit,
                 "klaar_vandaag": klaar, "drempel": drempel,
                 "wachtend_nieuw_niveau": ("rood" if nieuw and nieuw[0]["min"] >= drempel else "oranje" if nieuw else "leeg")}
 
@@ -1123,6 +1141,7 @@ def create_app(config=None):
         aan = "1" if request.form.get("accepteren_verplicht") else "0"
         zet_instelling("accepteren_verplicht", aan)
         zet_instelling("geluid_nieuw", "1" if request.form.get("geluid_nieuw") else "0")
+        zet_instelling("melding_chauffeur", "1" if request.form.get("melding_chauffeur") else "0")
         d = request.form.get("accepteer_drempel", type=int)
         if d and 1 <= d <= 120:
             zet_instelling("accepteer_drempel", d)

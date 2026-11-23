@@ -7,6 +7,7 @@
 <div class="kaart"><h2>Werkwijze</h2>
 <form method="post" action="{{ url_for('beheer_werkwijze') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <label><input type="checkbox" name="geluid_nieuw" value="1" {% if geluid %}checked{% endif %}> Geluidssignaal in het portaal bij een nieuw bericht</label>
+<label><input type="checkbox" name="melding_chauffeur" value="1" {% if melding_chauffeur %}checked{% endif %}> Melding (pop-up, geluid, trillen) bij een nieuwe opdracht op de routepagina</label>
 <label><input type="checkbox" name="accepteren_verplicht" value="1" {% if accepteren %}checked{% endif %}> Chauffeur moet een toegewezen stembureau eerst accepteren</label>
 <label>Waarschuwen als niet geaccepteerd na <input type="number" name="accepteer_drempel" min="1" max="120" value="{{ accepteer_drempel }}" style="width:5rem"> minuten (rood na het dubbele)</label><button>Opslaan</button></form>
 <p class="klein">Aan: een toegewezen opdracht staat eerst als "wacht op acceptatie". Zolang de chauffeur niet heeft geaccepteerd, kan de coördinator de opdracht naar een andere route verplaatsen. Uit: opdrachten gaan direct naar "onderweg" (zoals nu). Zet je dit uit, dan gaan opdrachten die nog op acceptatie wachten direct naar "onderweg". Het geluidssignaal speelt alleen op een geopende portaalpagina nadat de gebruiker daar op <em>Geluid aan</em> heeft geklikt (een browser staat geluid anders niet toe); elke gebruiker kan het op zijn eigen apparaat aan- of uitzetten.</p></div>

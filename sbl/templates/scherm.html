@@ -1,9 +1,11 @@
 <!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SBL Overzicht</title>
+<script src="{{ url_for('static', filename='geluid.js') }}"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font:18px/1.3 system-ui,sans-serif;background:#0b1220;color:#e5e7eb}
 header{display:flex;align-items:center;gap:1.5rem;padding:.8rem 1.5rem;background:#111a2e}
-header h1{margin:0;font-size:1.6rem;flex:1}.klok{font-size:2.2rem;font-weight:700}.tot{font-size:1.2rem;color:#9ca3af}
+header h1{margin:0;font-size:1.6rem;flex:1}.ikoon{padding:.3rem .7rem;font-size:1.4rem;background:transparent;border:1px solid #6b7280;border-radius:10px;color:#fff;cursor:pointer}.ikoon.aan{background:#16a34a;border-color:#16a34a}.ikoon.wacht{animation:puls 1.1s infinite}@keyframes puls{50%{box-shadow:0 0 0 5px #f59e0b}}
+.klok{font-size:2.2rem;font-weight:700}.tot{font-size:1.2rem;color:#9ca3af}
 .storing{background:#dc2626;color:#fff;padding:.7rem 1.5rem;font-size:1.4rem;font-weight:700;display:none}
 .nieuw{margin:1rem 1.5rem;padding:1rem 1.5rem;border-radius:14px;background:#1f2937;font-size:1.4rem}
 .nieuw.oranje{background:#b45309}.nieuw.rood{background:#b91c1c;animation:knip 1.2s infinite}
@@ -15,18 +17,22 @@ header h1{margin:0;font-size:1.6rem;flex:1}.klok{font-size:2.2rem;font-weight:70
 .kaart.leeg{opacity:.55}.kaart.groen{background:#14532d}.kaart.oranje{background:#b45309}.kaart.rood{background:#b91c1c}
 button{position:fixed;right:10px;bottom:10px;opacity:.4;padding:.4rem .8rem;border:0;border-radius:8px}
 </style></head><body>
-<header><h1>SBL Portaal – overzicht</h1><div class="tot" id="tot"></div><div class="klok" id="klok">--:--</div></header>
+<header><h1>SBL Portaal – overzicht</h1><div class="tot" id="tot"></div><button type="button" id="geluidknop" class="ikoon" hidden>🔕</button><div class="klok" id="klok">--:--</div></header>
 <div class="storing" id="storing">⚠ STORING – de sms-gateway meldt zich niet</div>
 <div class="nieuw" id="nieuw"></div>
 <div class="raster" id="raster"></div>
 <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">Volledig scherm</button>
 <script>
-var SLEUTEL={{ sleutel|tojson }};
+var SLEUTEL={{ sleutel|tojson }}, laatsteId=null;
+SBLGeluid.init({toegestaan:true});
 function esc(t){var d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;}
 function ververs(){
  fetch('{{ url_for("scherm_data") }}'+(SLEUTEL?'?sleutel='+encodeURIComponent(SLEUTEL):''),{cache:'no-store'})
  .then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
   document.getElementById('klok').textContent=d.tijd;
+  SBLGeluid.toegestaan(d.geluid);
+  if(laatsteId!==null&&d.nieuwste>laatsteId)SBLGeluid.signaal();
+  laatsteId=d.nieuwste;
   document.getElementById('tot').textContent='Klaar vandaag: '+d.klaar_vandaag;
   document.getElementById('storing').style.display=d.storing?'block':'none';
   var n=document.getElementById('nieuw');n.className='nieuw '+d.wachtend_nieuw_niveau;
