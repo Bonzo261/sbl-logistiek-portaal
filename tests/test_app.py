@@ -625,3 +625,30 @@ def test_portaal_status_en_geluidinstelling(client):
     assert c.get("/portaal/status.json").get_json()["geluid"] is True
     # alleen voor coördinator/beheerder
     assert c.application.test_client().get("/portaal/status.json").status_code == 302
+
+
+def test_chauffeur_melding_status_en_instelling(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "School A", "adres": "x", "telefoon": "061", "route_id": "1"}, "/beheer/stembureaus")
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "ch1", "wachtwoord": "chauffeur1234", "rol": "chauffeur", "route_id": "1"}, "/beheer/gebruikers")
+    ch = c.application.test_client()
+    post(ch, "/login", {"naam": "ch1", "wachtwoord": "chauffeur1234"})
+    s0 = ch.get("/route/1/status.json").get_json()
+    assert s0["items"] == [] and s0["melding"] is True
+    assert ch.get("/route/2/status.json").status_code == 403  # alleen eigen route
+    c.post(f"/api/sms?sleutel={sleutel(c)}", json={"message": "5"})
+    assert ch.get("/route/1/status.json").get_json()["items"] == []  # nog niet toegewezen
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    s1 = ch.get("/route/1/status.json").get_json()
+    assert s1["items"][0]["nr"] == 5 and s1["items"][0]["naam"] == "School A" and s1["handtekening"] != s0["handtekening"]
+    assert 'id="geluidknop"' in ch.get("/route/1").get_data(as_text=True)  # knop in de header
+    # beheerder zet de melding uit
+    post(c, "/beheer/werkwijze", {"geluid_nieuw": "1"}, "/beheer")
+    assert ch.get("/route/1/status.json").get_json()["melding"] is False
+    # overzichtsscherm krijgt ook de gegevens voor het geluid
+    d = c.get("/scherm/data.json").get_json()
+    assert d["nieuwste"] == 1 and d["geluid"] is True
+    assert "geluid.js" in c.get("/scherm").get_data(as_text=True)
+    assert c.get("/static/geluid.js").status_code == 200

@@ -1,6 +1,7 @@
 {% extends "basis.html" %}
-{% block kop %}<meta http-equiv="refresh" content="20">{% endblock %}
 {% block inhoud %}<h1>Route {{ route.nummer }}</h1>
+<div class="popup" id="popup"><span id="popuptekst"></span><button type="button" id="popupknop">OK</button></div>
+<div id="lijsten">
 {% for b in items if b.status == 'toegewezen' %}{% if loop.first %}<h2>Nieuwe opdrachten</h2>{% endif %}<div class="kaart" style="border:3px solid #f59e0b">
  <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
  <form method="post" action="{{ url_for('bericht_accepteer', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><p><button class="groen" style="font-size:1.2rem;padding:.8rem 1.4rem">✔ Accepteren – ik ga erheen</button></p></form>
@@ -10,4 +11,43 @@
  <p class="rij"><a class="knop" href="tel:{{ b.telefoon|replace(' ','') }}">📞 Bel voorzitter stembureau-{{ b.sb_nummer }}</a>
  <a class="knop grijs" href="https://www.google.com/maps/dir/?api=1&destination={{ b.adres|urlencode }}">Navigeer</a>
  <form method="post" action="{{ url_for('bericht_klaar', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><button class="groen">Klaar</button></form></p>
-</div>{% endfor %}{% if not items %}<p class="klein">Geen openstaande opdrachten.</p>{% endif %}{% endblock %}
+</div>{% endfor %}{% if not items %}<p class="klein">Geen openstaande opdrachten.</p>{% endif %}</div>
+<script>
+(function(){
+ var bekend={{ items|map(attribute='id')|list|tojson }}, hand=null, melding={{ 'true' if melding else 'false' }}, lock=null;
+ var popup=document.getElementById('popup'),tekst=document.getElementById('popuptekst');
+ SBLGeluid.init({toegestaan:melding});
+ document.getElementById('popupknop').addEventListener('click',function(){popup.style.display='none';});
+ function toonPopup(nieuwe){
+  tekst.textContent='🔔 Nieuwe opdracht: '+nieuwe.map(function(i){return 'stembureau '+(i.nr||'?')+(i.naam?' – '+i.naam:'');}).join(', ');
+  popup.style.display='flex';
+  SBLGeluid.signaal([300,150,300,150,300]);
+ }
+ function ververs(){
+  fetch(location.pathname,{cache:'no-store',credentials:'same-origin'}).then(function(r){return r.text();}).then(function(h){
+   var d=new DOMParser().parseFromString(h,'text/html'),n=d.getElementById('lijsten');
+   if(n)document.getElementById('lijsten').innerHTML=n.innerHTML;
+  });
+ }
+ function poll(){
+  fetch(location.pathname.replace(/\/$/,'')+'/status.json',{cache:'no-store',credentials:'same-origin'}).then(function(r){
+   if(r.redirected||!r.ok){if(r.redirected)location.reload();return null;}return r.json();
+  }).then(function(s){
+   if(!s)return;
+   melding=s.melding;SBLGeluid.toegestaan(melding);
+   var ids=s.items.map(function(i){return i.id;});
+   var nieuwe=s.items.filter(function(i){return bekend.indexOf(i.id)<0;});
+   if(hand!==null&&s.handtekening!==hand)ververs();
+   if(nieuwe.length&&melding)toonPopup(nieuwe);
+   bekend=ids;hand=s.handtekening;
+  }).catch(function(){});
+ }
+ function houdAan(){
+  if(!melding||!navigator.wakeLock||document.visibilityState!=='visible'||lock)return;
+  navigator.wakeLock.request('screen').then(function(l){lock=l;l.addEventListener('release',function(){lock=null;});}).catch(function(){});
+ }
+ document.addEventListener('visibilitychange',houdAan);
+ houdAan();poll();setInterval(poll,4000);
+})();
+</script>
+{% endblock %}

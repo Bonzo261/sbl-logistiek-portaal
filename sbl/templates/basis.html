@@ -1,13 +1,14 @@
 <!doctype html><html lang="nl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block titel %}SBL Portaal{% endblock %}</title>
+<script src="{{ url_for('static', filename='geluid.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='stijl.css') }}">
 {% block kop %}{% endblock %}</head><body>
 <header><strong>SBL Portaal</strong>
 {% if gebruiker %}
  {% if gebruiker.rol != 'chauffeur' %}<a href="{{ url_for('portaal') }}">Portaal</a><a href="{{ url_for('routes_overzicht') }}">Routes</a><a href="{{ url_for('scherm') }}">Scherm</a>{% endif %}
  {% if gebruiker.rol == 'beheerder' %}<a href="{{ url_for('beheer') }}">Beheer</a>{% endif %}
- <span class="sp"></span><a href="{{ url_for('account') }}" class="klein">{{ gebruiker.naam }}</a>
+ <span class="sp"></span><button type="button" id="geluidknop" class="ikoon" hidden>🔕</button><a href="{{ url_for('account') }}" class="klein">{{ gebruiker.naam }}</a>
  <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Uitloggen</button></form>
 {% endif %}</header>
 <main>{% if storing %}<div class="storing">⚠ Storing: de sms-gateway heeft zich al lang niet gemeld.</div>{% endif %}{% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
