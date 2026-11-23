@@ -659,7 +659,15 @@ def create_app(config=None):
     @app.post("/beheer/instellingen")
     @rol_vereist("beheerder")
     def beheer_instellingen():
-        if request.form.get("nieuwe_sleutel"):
+        if request.form.get("sleutel_modus") == "eigen":
+            eigen = request.form.get("eigen_sleutel", "").strip()
+            if eigen and eigen != instelling("sms_sleutel"):
+                if not re.fullmatch(r"[A-Za-z0-9_.~-]{3,64}", eigen):
+                    flash("Eigen sleutel: 3 tot 64 tekens, alleen letters, cijfers en _ . ~ -")
+                    return redirect(url_for("beheer"))
+                zet_instelling("sms_sleutel", eigen)
+                audit("sms-sleutel zelf ingesteld (onveilig)")
+        elif request.form.get("sleutel_modus") == "veilig":
             zet_instelling("sms_sleutel", secrets.token_urlsafe(24))
             audit("sms-sleutel vernieuwd")
         url = request.form.get("notificatie_url", "").strip()
