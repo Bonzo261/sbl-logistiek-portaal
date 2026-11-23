@@ -7,6 +7,8 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Beheer: gateway-status (verbonden, storing of nog geen heartbeat) met tijdstip van laatste heartbeat en laatste sms
+- Routes-overzicht toont ook de stembureaunummers per stadium
 - Routes-overzicht toont per route de stadia: wacht op acceptatie (alleen als acceptatie aan staat), onderweg en klaar vandaag, plus het aantal nieuwe berichten zonder route
 - Beheer: webhook-sleutel zelf kunnen invullen (met waarschuwing) naast het genereren van een veilige sleutel
 - Huisstijl: marine en oranje met Fira Sans (zelf gehost), nieuw logo en favicon (route met vinkje) in de kop, op de inlog- en instelpagina, het overzichtsscherm en in de README; alle pagina's, knoppen, tabellen en het overzichtsscherm in de nieuwe stijl; beschrijving in `docs/HUISSTIJL.md`

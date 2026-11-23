@@ -714,3 +714,28 @@ def test_routes_pagina_stadia(client):
     assert r.status_code == 200
     t = r.get_data(as_text=True)
     assert "Onderweg" in t and "Klaar vandaag" in t
+
+
+def test_gateway_status_en_routes_nummers(client):
+    maak_admin(client)
+    assert "nog geen heartbeat" in client.get("/beheer").get_data(as_text=True)
+    sl = sleutel(client)
+    client.get("/api/heartbeat?sleutel=" + sl)
+    assert "verbonden" in client.get("/beheer").get_data(as_text=True)
+    assert client.get("/routes").status_code == 200
+
+
+def test_routes_toont_stembureaunummers(client):
+    import sqlite3
+    maak_admin(client)
+    from flask import current_app
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    con.execute("INSERT INTO stembureau (nummer, naam) VALUES (77, 'Test')")
+    sid = con.execute("SELECT id FROM stembureau WHERE nummer=77").fetchone()[0]
+    rid = con.execute("SELECT id FROM route ORDER BY nummer LIMIT 1").fetchone()
+    if rid is None:
+        con.execute("INSERT INTO route (nummer) VALUES (1)")
+        rid = con.execute("SELECT id FROM route LIMIT 1").fetchone()
+    con.execute("INSERT INTO bericht (stembureau_id, tekst, status, route_id, ontvangen, onderweg_op) VALUES (?, '77', 'onderweg', ?, '2026-01-01 10:00:00', '2026-01-01 10:01:00')", (sid, rid[0]))
+    con.commit(); con.close()
+    assert "(77)" in client.get("/routes").get_data(as_text=True)

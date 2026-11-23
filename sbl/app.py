@@ -419,6 +419,21 @@ def create_app(config=None):
     def gateway_storing():
         return storing_nu(db())
 
+    def gateway_status():
+        """Toestand van de sms-gateway voor het beheerscherm."""
+        p = instelling("laatste_ping")
+        laatste_sms = db().execute("SELECT MAX(ontvangen) m FROM bericht").fetchone()["m"]
+        def geleden(t):
+            if not t:
+                return None
+            tz = ZoneInfo(app.config["TIJDZONE"])
+            return int((datetime.now(tz) - datetime.strptime(t, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)).total_seconds())
+        if not p:
+            toestand = "nooit"
+        else:
+            toestand = "storing" if storing_nu(db()) else "ok"
+        return {"toestand": toestand, "ping": p, "ping_s": geleden(p), "sms": laatste_sms, "sms_s": geleden(laatste_sms)}
+
     def stuur_melding(url, titel, tekst):
         try:
             req = urllib.request.Request(url, data=tekst.encode(), method="POST",
@@ -616,11 +631,24 @@ def create_app(config=None):
     @app.get("/routes")
     @rol_vereist("beheerder", "coordinator")
     def routes_overzicht():
-        def tel(st, extra=""):
-            return f"(SELECT COUNT(*) FROM bericht b WHERE b.route_id=r.id AND b.status='{st}'{extra})"
-        rows = db().execute(f"""SELECT r.*, {tel('toegewezen')} AS wacht, {tel('onderweg')} AS onderweg,
-                               {tel('klaar', " AND substr(b.klaar_op,1,10)=?")} AS klaar
-                               FROM route r ORDER BY r.nummer""", (nu(app)[:10],)).fetchall()
+        rows = db().execute("SELECT * FROM route ORDER BY r.nummer".replace("r.", "")).fetchall()
+        vandaag = nu(app)[:10]
+        data = {r["id"]: {"nummer": r["nummer"], "id": r["id"], "wacht": [], "onderweg": [], "klaar": []} for r in rows}
+        for b in db().execute("""SELECT b.route_id, b.status, b.klaar_op, s.nummer FROM bericht b
+                                 LEFT JOIN stembureau s ON s.id=b.stembureau_id
+                                 WHERE b.route_id IS NOT NULL AND b.status IN ('toegewezen','onderweg','klaar')
+                                 ORDER BY b.onderweg_op, b.id"""):
+            d = data.get(b["route_id"])
+            if d is None:
+                continue
+            nr = b["nummer"] if b["nummer"] is not None else "?"
+            if b["status"] == "toegewezen":
+                d["wacht"].append(nr)
+            elif b["status"] == "onderweg":
+                d["onderweg"].append(nr)
+            elif (b["klaar_op"] or "")[:10] == vandaag:
+                d["klaar"].append(nr)
+        rows = list(data.values())
         nieuw = db().execute("SELECT COUNT(*) c FROM bericht WHERE status='nieuw'").fetchone()["c"]
         return render_template("routes.html", rows=rows, nieuw=nieuw,
                                accepteren=instelling("accepteren_verplicht", "0") == "1")
@@ -632,6 +660,7 @@ def create_app(config=None):
         return render_template("beheer.html",
                                n_routes=db().execute("SELECT COUNT(*) c FROM route").fetchone()["c"],
                                n_sb=db().execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
+                               gateway=gateway_status(),
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
