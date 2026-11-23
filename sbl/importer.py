@@ -1,9 +1,11 @@
 """Import van stembureaus en routes uit CSV of Excel (.xlsx)."""
 import csv
 import io
+import zipfile
+from xml.etree import ElementTree as ET
 
 ALIASSEN = {
-    "nummer": ["nummer", "stembureau", "nr", "stembureaunummer", "stembureau nummer"],
+    "nummer": ["nummer", "stembureau", "nr", "stembureaunummer", "stembureau nummer", "sbnummer", "sbnummers", "sb nummer", "sb"],
     "naam": ["naam", "locatie", "stembureaunaam"],
     "adres": ["adres"],
     "straat": ["straat", "staat"],
@@ -25,7 +27,34 @@ def _cel(v):
         return ""
     if isinstance(v, float) and v.is_integer():
         v = int(v)
-    return str(v).strip()
+    return " ".join(str(v).split())
+
+
+def _lees_ods(data):
+    """Leest het eerste werkblad van een .ods-bestand met alleen de standaardbibliotheek."""
+    ns = {"t": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+          "x": "urn:oasis:names:tc:opendocument:xmlns:text:1.0"}
+    T = "{%s}" % ns["t"]
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        root = ET.fromstring(z.read("content.xml"))
+    tabel = root.find(".//t:table", ns)
+    rijen = []
+    for rij in tabel.iter(T + "table-row"):
+        cellen = []
+        for c in rij:
+            if c.tag not in (T + "table-cell", T + "covered-table-cell"):
+                continue
+            waarde = c.get("{urn:oasis:names:tc:opendocument:xmlns:office:1.0}value")
+            if waarde is None:
+                waarde = _cel(" ".join("".join(p.itertext()) for p in c.findall("x:p", ns)))
+            else:
+                waarde = _cel(float(waarde))
+            cellen += [waarde] * min(int(c.get(T + "number-columns-repeated", 1)), 50)
+        while cellen and not cellen[-1]:
+            cellen.pop()
+        herhaal = min(int(rij.get(T + "number-rows-repeated", 1)), 5)
+        rijen += [cellen] * (herhaal if cellen else 0)
+    return rijen
 
 
 def lees_rijen(bestandsnaam, data):
@@ -35,6 +64,8 @@ def lees_rijen(bestandsnaam, data):
         from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         return [[_cel(c) for c in r] for r in wb.worksheets[0].iter_rows(values_only=True)]
+    if naam.endswith(".ods"):
+        return _lees_ods(data)
     if naam.endswith((".csv", ".txt")):
         try:
             tekst = data.decode("utf-8-sig")
@@ -44,8 +75,13 @@ def lees_rijen(bestandsnaam, data):
             dialect = csv.Sniffer().sniff(tekst[:4096], delimiters=";,\t")
         except csv.Error:
             dialect = csv.excel
-        return [[c.strip() for c in r] for r in csv.reader(io.StringIO(tekst), dialect)]
-    raise ImportFout("Alleen .csv en .xlsx worden ondersteund.")
+        return [[_cel(c) for c in r] for r in csv.reader(io.StringIO(tekst), dialect)]
+    raise ImportFout("Alleen .csv, .xlsx en .ods worden ondersteund.")
+
+
+def _telefoon(t):
+    """Excel slaat 0612345678 vaak op als getal; herstel de weggevallen 0."""
+    return "0" + t if t.isdigit() and len(t) == 9 else t
 
 
 def verwerk(rijen):
@@ -86,5 +122,5 @@ def verwerk(rijen):
             except ValueError:
                 fouten.append(f"Regel {regel}: ongeldige route '{g('route')}'")
         uit.append({"nummer": nr, "naam": g("naam"), "adres": adres,
-                    "telefoon": g("telefoon"), "route": route})
+                    "telefoon": _telefoon(g("telefoon")), "route": route})
     return uit, fouten
