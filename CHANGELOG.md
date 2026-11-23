@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Optionele acceptatie door de chauffeur (*Beheer → Werkwijze*): toegewezen opdrachten wachten op acceptatie en kunnen tot dat moment door de coördinator naar een andere route verplaatst worden; ook zichtbaar op het overzichtsscherm
 - Overzichtsscherm voor de wand (`/scherm`) met kleurcodering op wachttijd, instelbare drempel en optionele geheime link zonder login (zonder adressen en telefoonnummers)
 - Automatische dagelijkse back-up (vanaf 03:00) met bewaartermijn, lijst, download en herstel vanuit het scherm; mislukte back-ups worden gemeld
 - Sessies vervallen bij wachtwoordwijziging/-reset en 2FA-reset; knop "Uitloggen op alle andere apparaten"

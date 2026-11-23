@@ -1,9 +1,13 @@
 {% extends "basis.html" %}
 {% block kop %}<meta http-equiv="refresh" content="20">{% endblock %}
 {% block inhoud %}<h1>Route {{ route.nummer }}</h1>
-{% for b in items %}<div class="kaart">
+{% for b in items if b.status == 'toegewezen' %}{% if loop.first %}<h2>Nieuwe opdrachten</h2>{% endif %}<div class="kaart" style="border:3px solid #f59e0b">
+ <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
+ <form method="post" action="{{ url_for('bericht_accepteer', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><p><button class="groen" style="font-size:1.2rem;padding:.8rem 1.4rem">✔ Accepteren – ik ga erheen</button></p></form>
+</div>{% endfor %}
+{% for b in items if b.status == 'onderweg' %}{% if loop.first and items|selectattr('status','eq','toegewezen')|list %}<h2>Onderweg</h2>{% endif %}<div class="kaart">
  <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
  <p class="rij"><a class="knop" href="tel:{{ b.telefoon|replace(' ','') }}">📞 Bel voorzitter stembureau-{{ b.sb_nummer }}</a>
  <a class="knop grijs" href="https://www.google.com/maps/dir/?api=1&destination={{ b.adres|urlencode }}">Navigeer</a>
  <form method="post" action="{{ url_for('bericht_klaar', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><button class="groen">Klaar</button></form></p>
-</div>{% else %}<p class="klein">Geen openstaande opdrachten.</p>{% endfor %}{% endblock %}
+</div>{% endfor %}{% if not items %}<p class="klein">Geen openstaande opdrachten.</p>{% endif %}{% endblock %}

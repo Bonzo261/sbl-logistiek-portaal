@@ -32,7 +32,7 @@ function ververs(){
   var n=document.getElementById('nieuw');n.className='nieuw '+d.wachtend_nieuw_niveau;
   n.innerHTML=d.nieuw.length?('<strong>Wacht op routekeuze: '+d.nieuw.length+'</strong> – '+d.nieuw.map(function(i){return esc(i.nr||'?')+' ('+i.min+' min)';}).join(', ')):'Geen berichten die op een route wachten ✔';
   document.getElementById('raster').innerHTML=d.routes.map(function(r){
-   var lijst=r.open.slice(0,4).map(function(i){return '<li>'+esc(i.nr)+' '+esc(i.naam)+' · '+i.min+' min</li>';}).join('');
+   var lijst=r.open.slice(0,4).map(function(i){return '<li>'+(i.wacht?'⏳ ':'')+esc(i.nr)+' '+esc(i.naam)+' · '+i.min+' min'+(i.wacht?' (wacht op acceptatie)':'')+'</li>';}).join('');
    return '<div class="kaart '+r.niveau+'"><div class="nr">Route '+r.nummer+'</div><div class="n">'+r.open.length+'</div>'+
     (r.open.length?'<div class="min">langste wacht '+r.langste+' min</div><ul>'+lijst+(r.open.length>4?'<li>+ '+(r.open.length-4)+' meer</li>':'')+'</ul>':'<div class="min">geen opdrachten</div>')+'</div>';
   }).join('');
