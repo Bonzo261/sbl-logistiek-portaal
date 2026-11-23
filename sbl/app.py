@@ -1,6 +1,7 @@
 """SBL Logistiek Portaal - kern van de webapp."""
 import io
 import json
+import re
 import os
 import secrets
 import threading
@@ -33,7 +34,8 @@ def migreer(c):
     kolommen = {k[1] for k in c.execute("PRAGMA table_info(gebruiker)")}
     for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0"),
                      ("herstel", "TEXT NOT NULL DEFAULT '[]'"),
-                     ("moet_wijzigen", "INTEGER NOT NULL DEFAULT 0")):
+                     ("moet_wijzigen", "INTEGER NOT NULL DEFAULT 0"),
+                     ("email", "TEXT NOT NULL DEFAULT ''")):
         if kol not in kolommen:
             c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
     c.commit()
@@ -174,8 +176,12 @@ def create_app(config=None):
             if not naam or len(ww) < 10:
                 flash("Kies een naam en een wachtwoord van minimaal 10 tekens.")
             else:
-                db().execute("INSERT INTO gebruiker (naam, hash, rol) VALUES (?,?,'beheerder')",
-                             (naam, generate_password_hash(ww)))
+                mail = request.form.get("email", "").strip().lower()
+                if not geldig_email(mail):
+                    flash("Dit is geen geldig e-mailadres.")
+                    return render_template("setup.html")
+                db().execute("INSERT INTO gebruiker (naam, hash, rol, email) VALUES (?,?,'beheerder',?)",
+                             (naam, generate_password_hash(ww), mail))
                 flash("Beheerder aangemaakt. Log nu in.")
                 return redirect(url_for("login"))
         return render_template("setup.html")
@@ -648,9 +654,43 @@ def create_app(config=None):
                          (f["naam"].strip(), generate_password_hash(f["wachtwoord"]), rol,
                           f.get("route_id", type=int) if rol == "chauffeur" else None,
                           1 if f.get("moet_wijzigen") else 0))
+            if f.get("email", "").strip():
+                nieuw_id = db().execute("SELECT id FROM gebruiker WHERE naam=?", (f["naam"].strip(),)).fetchone()["id"]
+                fout = sla_email_op(nieuw_id, f["email"])
+                if fout:
+                    flash("Gebruiker aangemaakt, maar het e-mailadres is niet opgeslagen: " + fout)
         except sqlite3.IntegrityError:
             flash("Deze naam bestaat al.")
         audit(f"gebruiker {f['naam']} aangemaakt")
+        return redirect(url_for("beheer_gebruikers"))
+
+    def geldig_email(adres):
+        """Eenvoudige controle; een leeg adres is toegestaan (geen e-mail ingesteld)."""
+        return adres == "" or (len(adres) <= 120 and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]{2,}", adres) is not None)
+
+    def sla_email_op(uid, adres):
+        adres = adres.strip().lower()
+        if not geldig_email(adres):
+            return "Dit is geen geldig e-mailadres."
+        if adres and db().execute("SELECT 1 FROM gebruiker WHERE lower(email)=? AND id!=?", (adres, uid)).fetchone():
+            return "Dit e-mailadres is al in gebruik bij een andere gebruiker."
+        db().execute("UPDATE gebruiker SET email=? WHERE id=?", (adres, uid))
+        audit(f"e-mailadres gebruiker-id {uid} {'ingesteld' if adres else 'verwijderd'}")
+        return None
+
+    @app.post("/account/email")
+    def account_email():
+        if not g.gebruiker:
+            abort(403)
+        fout = sla_email_op(g.gebruiker["id"], request.form.get("email", ""))
+        flash(fout or "E-mailadres opgeslagen.")
+        return redirect(url_for("account"))
+
+    @app.post("/beheer/gebruikers/<int:uid>/email")
+    @rol_vereist("beheerder")
+    def gebruiker_email(uid):
+        fout = sla_email_op(uid, request.form.get("email", ""))
+        flash(fout or "E-mailadres opgeslagen.")
         return redirect(url_for("beheer_gebruikers"))
 
     def tijdelijk_wachtwoord():

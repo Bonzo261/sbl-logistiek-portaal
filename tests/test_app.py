@@ -300,3 +300,22 @@ def test_wachtwoorden_excel(client):
     for r_, (naam, ww) in zip(rijen[1:], re.findall(r"<td>(route\d)</td><td><code>(\w{12})</code>", pagina)):
         assert r_[2] == ww and r_[3].endswith("/login")
     assert post(c, "/beheer/gebruikers/wachtwoorden.xlsx", {"data": "kapot"}, "/beheer/gebruikers/bulk").status_code == 400
+
+
+def test_email_instellen(client):
+    c = client
+    c.get("/setup")
+    post(c, "/setup", {"naam": "admin", "wachtwoord": "langwachtwoord1", "email": "Beheer@Voorbeeld.NL"}, "/setup")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert 'value="beheer@voorbeeld.nl"' in c.get("/account").get_data(as_text=True)  # kleine letters
+    r = post(c, "/account/email", {"email": "geen-adres"}, "/account", follow_redirects=True)
+    assert "geen geldig" in r.get_data(as_text=True)
+    post(c, "/beheer/gebruikers/nieuw", {"naam": "co", "wachtwoord": "coordinator123", "rol": "coordinator",
+                                          "email": "co@voorbeeld.nl"}, "/beheer/gebruikers")
+    assert "co@voorbeeld.nl" in c.get("/beheer/gebruikers").get_data(as_text=True)
+    # hetzelfde adres bij een andere gebruiker wordt geweigerd
+    r = post(c, "/account/email", {"email": "co@voorbeeld.nl"}, "/account", follow_redirects=True)
+    assert "al in gebruik" in r.get_data(as_text=True)
+    # leegmaken kan
+    post(c, "/account/email", {"email": ""}, "/account")
+    assert 'value="beheer@' not in c.get("/account").get_data(as_text=True)

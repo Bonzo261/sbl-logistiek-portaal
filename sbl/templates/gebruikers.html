@@ -1,7 +1,7 @@
 {% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('beheer') }}">← Terug naar beheer</a></p>
 <h1>Gebruikers</h1>
 <form method="post" action="{{ url_for('gebruiker_nieuw') }}" class="kaart rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
-<input name="naam" placeholder="Naam" required><input type="password" name="wachtwoord" placeholder="Wachtwoord (min. 10)" minlength="10" required>
+<input name="naam" placeholder="Naam" required><input type="email" name="email" placeholder="E-mail (optioneel)" maxlength="120"><input type="password" name="wachtwoord" placeholder="Wachtwoord (min. 10)" minlength="10" required>
 <select name="rol">{% for r in rollen %}<option>{{ r }}</option>{% endfor %}</select>
 <select name="route_id"><option value="">Route (alleen chauffeur)</option>{% for r in routes %}<option value="{{ r.id }}">Route {{ r.nummer }}</option>{% endfor %}</select><label class="klein"><input type="checkbox" name="moet_wijzigen" value="1" checked> moet wachtwoord wijzigen bij 1e keer inloggen</label><button>Aanmaken</button></form>
 <p><a class="knop" href="{{ url_for('gebruikers_bulk') }}">Chauffeursaccounts per route aanmaken (bulk)</a></p>
@@ -11,8 +11,8 @@
 <option value="reset2fa">2FA resetten</option><option value="route">Route wijzigen (chauffeurs)</option><option value="verwijder">Verwijderen</option></select>
 <select name="route_id" id="routekeuze" style="display:none">{% for r in routes %}<option value="{{ r.id }}">Route {{ r.nummer }}</option>{% endfor %}</select>
 <button id="uitvoeren">Uitvoeren</button><span class="klein" id="teller">0 geselecteerd</span></form>
-<table><tr><th><input type="checkbox" id="alles" title="Alles selecteren"></th><th>Naam</th><th>Rol</th><th>Route</th><th colspan="3"></th></tr>
-{% for u in rows %}<tr><td>{% if u.id != gebruiker.id %}<input type="checkbox" class="sel" name="uid" value="{{ u.id }}" form="selectieform">{% endif %}</td><td>{{ u.naam }}</td><td>{{ u.rol }}</td><td>{% if u.route_nummer %}route {{ u.route_nummer }}{% endif %}</td>
+<table><tr><th><input type="checkbox" id="alles" title="Alles selecteren"></th><th>Naam</th><th>Rol</th><th>Route</th><th>E-mail</th><th colspan="3"></th></tr>
+{% for u in rows %}<tr><td>{% if u.id != gebruiker.id %}<input type="checkbox" class="sel" name="uid" value="{{ u.id }}" form="selectieform">{% endif %}</td><td>{{ u.naam }}</td><td>{{ u.rol }}</td><td>{% if u.route_nummer %}route {{ u.route_nummer }}{% endif %}</td><td><form method="post" action="{{ url_for('gebruiker_email', uid=u.id) }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="email" name="email" value="{{ u.email }}" placeholder="–" maxlength="120" style="width:11rem"><button class="grijs">✓</button></form></td>
 <td><form method="post" action="{{ url_for('gebruiker_wachtwoord', uid=u.id) }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="password" name="nieuw" placeholder="Nieuw wachtwoord" minlength="10" required style="width:9rem"><button class="grijs">Reset ww</button></form></td>
 <td>{% if u.totp_geheim %}<form method="post" action="{{ url_for('gebruiker_reset2fa', uid=u.id) }}" onsubmit="return confirm('2FA resetten?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Reset 2FA</button></form>{% endif %}</td>
 <td><form method="post" action="{{ url_for('gebruiker_verwijder', uid=u.id) }}" onsubmit="return confirm('Verwijderen?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="rood">✕</button></form></td></tr>{% endfor %}</table><script>
