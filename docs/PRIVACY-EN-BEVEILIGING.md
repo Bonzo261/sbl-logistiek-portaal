@@ -37,4 +37,4 @@ De app gebruikt geen externe diensten, trackers of lettertype-servers. Verkeer n
 8. De beheerder kan een meldings-URL instellen waar de app naartoe verbindt. Geef de beheerdersrol daarom alleen aan vertrouwde personen.
 
 ## Een kwetsbaarheid melden
-Meld beveiligingsproblemen niet in een openbaar issue maar rechtstreeks aan de beheerder van de repository (zie het GitHub-profiel van de eigenaar).
+Zie [`SECURITY.md`](../SECURITY.md).

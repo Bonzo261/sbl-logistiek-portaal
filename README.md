@@ -97,7 +97,7 @@ Bij elke wijziging op `main` draaien de tests en bouwt GitHub een image voor Doc
 pip install -r requirements-dev.txt
 python -m pytest
 ```
-De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom via pull requests; voeg een test toe en noteer de wijziging in `CHANGELOG.md`.
+De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom, zie [`CONTRIBUTING.md`](CONTRIBUTING.md); beveiligingsproblemen meld je volgens [`SECURITY.md`](SECURITY.md).
 
 ## Roadmap
 Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, Postgres.
