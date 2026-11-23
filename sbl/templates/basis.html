@@ -7,8 +7,8 @@
 {% if gebruiker %}
  {% if gebruiker.rol != 'chauffeur' %}<a href="{{ url_for('portaal') }}">Portaal</a><a href="{{ url_for('routes_overzicht') }}">Routes</a>{% endif %}
  {% if gebruiker.rol == 'beheerder' %}<a href="{{ url_for('beheer') }}">Beheer</a>{% endif %}
- <span class="sp"></span><span class="klein">{{ gebruiker.naam }}</span>
+ <span class="sp"></span><a href="{{ url_for('account') }}" class="klein">{{ gebruiker.naam }}</a>
  <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Uitloggen</button></form>
 {% endif %}</header>
-<main>{% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+<main>{% if storing %}<div class="storing">⚠ Storing: de sms-gateway heeft zich al lang niet gemeld.</div>{% endif %}{% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
 {% block inhoud %}{% endblock %}</main></body></html>

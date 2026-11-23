@@ -1,0 +1,14 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Mijn account</h1>
+<div class="kaart"><h2>Tweestapsverificatie</h2>
+{% if gebruiker.totp_geheim %}<p>✅ Ingeschakeld.</p>
+{% else %}
+ {% if verplicht %}<p><strong>Voor jouw rol is tweestapsverificatie verplicht.</strong> Stel het eerst in.</p>{% endif %}
+ {% if geheim %}
+  <p>1. Voeg dit account toe in een authenticator-app (bijv. Google Authenticator, Aegis of Microsoft Authenticator). Op een telefoon kun je op deze link tikken: <a href="{{ uri }}">toevoegen in app</a>.</p>
+  <p>Of voer deze sleutel handmatig in:<br><code style="font-size:1.1rem;word-break:break-all">{{ geheim }}</code></p>
+  <form method="post" action="{{ url_for('tweefa_bevestig') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <label>2. Code uit de app: <input name="code" inputmode="numeric" maxlength="7" required></label><button class="groen">Inschakelen</button></form>
+ {% else %}
+  <form method="post" action="{{ url_for('tweefa_start') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button>Instellen</button></form>
+ {% endif %}
+{% endif %}</div>{% endblock %}

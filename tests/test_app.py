@@ -10,7 +10,7 @@ CSV = "Nummer;Locatie;Adres;Telefoon;Route\n1;School A;Dorpsstraat 1;0612345678;
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app({"DATABASE": str(tmp_path / "t.db"), "TESTING": True})
+    app = create_app({"DATABASE": str(tmp_path / "t.db"), "TESTING": True, "TWEEFA_VERPLICHT": False})
     return app.test_client()
 
 
@@ -100,3 +100,51 @@ def test_login_geblokkeerd_na_tien_pogingen(client):
         post(client, "/login", {"naam": "admin", "wachtwoord": "fout"})
     r = post(client, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
     assert r.status_code == 429
+
+
+def test_tweefa_verplicht_en_login(tmp_path):
+    import time
+    from sbl import totp
+    c = create_app({"DATABASE": str(tmp_path / "2.db"), "TESTING": True}).test_client()
+    post(c, "/setup", {"naam": "admin", "wachtwoord": "langwachtwoord1"}, "/setup")
+    post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert c.get("/portaal").headers["Location"].endswith("/account")  # verplicht instellen
+    post(c, "/account/2fa/start", tokenurl="/account")
+    geheim = re.search(r"<code[^>]*>(\w+)</code>", c.get("/account").get_data(as_text=True)).group(1)
+    teller = int(time.time() // 30)
+    assert "onjuist" in post(c, "/account/2fa/bevestig", {"code": "000000"}, "/account", follow_redirects=True).get_data(as_text=True)
+    post(c, "/account/2fa/bevestig", {"code": totp.code(geheim, teller)}, "/account")
+    assert c.get("/portaal").status_code == 200
+    post(c, "/logout", tokenurl="/portaal")
+    r = post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert r.headers["Location"].endswith("/login/2fa")
+    assert c.get("/portaal", follow_redirects=False).status_code == 302  # nog niet ingelogd
+    # dezelfde code mag niet nogmaals (replay) ...
+    post(c, "/login/2fa", {"code": totp.code(geheim, teller)}, "/login/2fa")
+    assert c.get("/portaal").status_code == 302
+    # ... een nieuwe wel
+    post(c, "/login/2fa", {"code": totp.code(geheim, teller + 1)}, "/login/2fa")
+    assert c.get("/portaal").status_code == 200
+
+
+def test_totp_rfc6238_vector():
+    from sbl import totp
+    import base64
+    geheim = base64.b32encode(b"12345678901234567890").decode()
+    assert totp.code(geheim, 59 // 30) == "287082"
+
+
+def test_storing_bewaking_meldt_een_keer(tmp_path, monkeypatch):
+    import sqlite3
+    app = create_app({"DATABASE": str(tmp_path / "s.db"), "TESTING": True, "TWEEFA_VERPLICHT": False})
+    verzonden = []
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=0: verzonden.append(req.full_url) or io.BytesIO(b""))
+    with sqlite3.connect(str(tmp_path / "s.db")) as c:
+        c.execute("INSERT INTO instelling VALUES ('notificatie_url','https://ntfy.example/topic')")
+        c.execute("INSERT INTO instelling VALUES ('laatste_ping','2020-01-01 00:00:00')")
+    app.bewaak_gateway(); app.bewaak_gateway()
+    assert len(verzonden) == 1  # storing maar één keer gemeld
+    with sqlite3.connect(str(tmp_path / "s.db")) as c:
+        c.execute("UPDATE instelling SET value='2999-01-01 00:00:00' WHERE key='laatste_ping'")
+    app.bewaak_gateway()
+    assert len(verzonden) == 2  # herstel gemeld

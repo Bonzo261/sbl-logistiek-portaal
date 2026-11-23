@@ -2,7 +2,9 @@
 import json
 import os
 import secrets
+import threading
 import time
+import urllib.request
 import sqlite3
 from datetime import datetime
 from functools import wraps
@@ -12,7 +14,7 @@ from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import importer
+from . import importer, totp
 
 HIER = os.path.dirname(__file__)
 ROLLEN = ("beheerder", "coordinator", "chauffeur")
@@ -29,6 +31,7 @@ def create_app(config=None):
         DATABASE=os.environ.get("SBL_DATABASE", "sbl.db"),
         SECRET_KEY=os.environ.get("SBL_SECRET_KEY", ""),
         TIJDZONE=os.environ.get("SBL_TIJDZONE", "Europe/Amsterdam"),
+        TWEEFA_VERPLICHT=os.environ.get("SBL_2FA_VERPLICHT", "1") == "1",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SBL_HTTPS", "0") == "1",
@@ -41,6 +44,10 @@ def create_app(config=None):
         app.config["SECRET_KEY"] = "tijdelijk"
     with sqlite3.connect(app.config["DATABASE"]) as c:
         c.executescript(open(os.path.join(HIER, "schema.sql")).read())
+        kolommen = {k[1] for k in c.execute("PRAGMA table_info(gebruiker)")}
+        for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0")):
+            if kol not in kolommen:
+                c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
         r = c.execute("SELECT value FROM instelling WHERE key='secret_key'").fetchone()
         if not r:
             c.execute("INSERT INTO instelling VALUES ('secret_key', ?)", (secrets.token_hex(32),))
@@ -98,6 +105,10 @@ def create_app(config=None):
             g.gebruiker = db().execute("SELECT * FROM gebruiker WHERE id=?", (session["uid"],)).fetchone()
             if not g.gebruiker:
                 session.clear()
+            elif (app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur"
+                  and not g.gebruiker["totp_geheim"]
+                  and request.endpoint not in ("account", "tweefa_start", "tweefa_bevestig", "logout", "static")):
+                return redirect(url_for("account"))
 
     def rol_vereist(*rollen):
         def deco(f):
@@ -113,7 +124,9 @@ def create_app(config=None):
 
     @app.context_processor
     def sjabloon_context():
-        return {"gebruiker": g.get("gebruiker"), "nu_tijd": nu(app)}
+        gb = g.get("gebruiker")
+        return {"gebruiker": gb, "nu_tijd": nu(app),
+                "storing": bool(gb and gb["rol"] != "chauffeur" and storing_nu(db()))}
 
     # ---------- helpers ----------
     def advies_route(bericht):
@@ -152,6 +165,70 @@ def create_app(config=None):
                 return redirect(url_for("login"))
         return render_template("setup.html")
 
+    def voltooi_login(u, nxt=""):
+        session["uid"], session["naam"] = u["id"], u["naam"]
+        audit("inloggen")
+        return redirect(nxt or url_for("start"))
+
+    @app.route("/login/2fa", methods=["GET", "POST"])
+    def login_2fa():
+        u = db().execute("SELECT * FROM gebruiker WHERE id=?", (session.get("pre_uid"),)).fetchone()
+        if not u or time.time() - session.get("pre_tijd", 0) > 300:
+            session.clear()
+            return redirect(url_for("login"))
+        if request.method == "POST":
+            nu_ts = time.time()
+            sl = "n:" + u["naam"].lower()
+            if db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel=?", (sl,)).fetchone()["c"] >= 10:
+                return render_template("login_2fa.html"), 429
+            teller = totp.controleer(u["totp_geheim"], request.form.get("code"), u["totp_laatst"])
+            if teller:
+                db().execute("UPDATE gebruiker SET totp_laatst=? WHERE id=?", (teller, u["id"]))
+                nxt = session.get("pre_next", "")
+                session.clear()
+                return voltooi_login(u, nxt)
+            db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, sl))
+            flash("Onjuiste code.")
+        return render_template("login_2fa.html")
+
+    @app.get("/account")
+    def account():
+        if not g.gebruiker:
+            return redirect(url_for("login"))
+        geheim = session.get("nieuw_totp")
+        return render_template("account.html", geheim=geheim,
+                               uri=totp.uri(geheim, g.gebruiker["naam"]) if geheim else None,
+                               verplicht=app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur")
+
+    @app.post("/account/2fa/start")
+    def tweefa_start():
+        if not g.gebruiker:
+            abort(403)
+        session["nieuw_totp"] = totp.nieuw_geheim()
+        return redirect(url_for("account"))
+
+    @app.post("/account/2fa/bevestig")
+    def tweefa_bevestig():
+        if not g.gebruiker or not session.get("nieuw_totp"):
+            abort(403)
+        teller = totp.controleer(session["nieuw_totp"], request.form.get("code"))
+        if not teller:
+            flash("Code onjuist. Probeer het opnieuw.")
+            return redirect(url_for("account"))
+        db().execute("UPDATE gebruiker SET totp_geheim=?, totp_laatst=? WHERE id=?",
+                     (session.pop("nieuw_totp"), teller, g.gebruiker["id"]))
+        audit("2fa ingeschakeld")
+        flash("Tweestapsverificatie is ingeschakeld.")
+        return redirect(url_for("start"))
+
+    @app.post("/beheer/gebruikers/<int:uid>/reset2fa")
+    @rol_vereist("beheerder")
+    def gebruiker_reset2fa(uid):
+        db().execute("UPDATE gebruiker SET totp_geheim=NULL, totp_laatst=0 WHERE id=?", (uid,))
+        audit(f"2fa gereset voor gebruiker-id {uid}")
+        flash("2FA gereset; de gebruiker stelt het bij de volgende keer opnieuw in.")
+        return redirect(url_for("beheer_gebruikers"))
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
@@ -168,11 +245,13 @@ def create_app(config=None):
                 for k in ("n:" + naam, "ip:" + (request.remote_addr or "")):
                     db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, k))
             if u and check_password_hash(u["hash"], request.form["wachtwoord"]):
-                session.clear()
-                session["uid"], session["naam"] = u["id"], u["naam"]
-                audit("inloggen")
                 nxt = request.args.get("next", "")
-                return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("start"))
+                nxt = nxt if nxt.startswith("/") and not nxt.startswith("//") else ""
+                session.clear()
+                if u["totp_geheim"]:
+                    session["pre_uid"], session["pre_tijd"], session["pre_next"] = u["id"], time.time(), nxt
+                    return redirect(url_for("login_2fa"))
+                return voltooi_login(u, nxt)
             flash("Onjuiste naam of wachtwoord.")
         return render_template("login.html")
 
@@ -210,14 +289,62 @@ def create_app(config=None):
         zet_instelling("laatste_ping", nu(app))
         return jsonify(ok=True)
 
-    def gateway_storing():
-        p = instelling("laatste_ping")
+    def storing_nu(conn):
+        def inst(k, d=""):
+            r = conn.execute("SELECT value FROM instelling WHERE key=?", (k,)).fetchone()
+            return r[0] if r else d
+        p = inst("laatste_ping")
         if not p:
             return False
-        grens = int(instelling("storing_seconden", "600"))
-        verschil = datetime.now(ZoneInfo(app.config["TIJDZONE"])) - datetime.strptime(p, "%Y-%m-%d %H:%M:%S").replace(
-            tzinfo=ZoneInfo(app.config["TIJDZONE"]))
-        return verschil.total_seconds() > grens
+        tz = ZoneInfo(app.config["TIJDZONE"])
+        verschil = datetime.now(tz) - datetime.strptime(p, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
+        return verschil.total_seconds() > int(inst("storing_seconden", "600"))
+
+    def gateway_storing():
+        return storing_nu(db())
+
+    def stuur_melding(url, titel, tekst):
+        try:
+            req = urllib.request.Request(url, data=tekst.encode(), method="POST",
+                                         headers={"Title": titel.encode("latin-1", "ignore").decode(), "Priority": "high"})
+            urllib.request.urlopen(req, timeout=10).read()
+        except Exception as e:  # melding mag de app nooit laten crashen
+            app.logger.warning("Melding versturen mislukt: %s", e)
+
+    def bewaak_gateway():
+        """Controleert de heartbeat; meldt storing en herstel precies één keer (ook bij meerdere workers)."""
+        with sqlite3.connect(app.config["DATABASE"], timeout=10) as c:
+            def inst(k, d=""):
+                r = c.execute("SELECT value FROM instelling WHERE key=?", (k,)).fetchone()
+                return r[0] if r else d
+            url = inst("notificatie_url")
+            c.execute("INSERT OR IGNORE INTO instelling VALUES ('storing_gemeld','0')")
+            storing = storing_nu(c)
+            if storing and c.execute("UPDATE instelling SET value='1' WHERE key='storing_gemeld' AND value='0'").rowcount:
+                c.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)", (nu(app), None, "gateway-storing"))
+                c.commit()
+                if url:
+                    stuur_melding(url, "SBL Portaal: storing", "De sms-gateway heeft zich niet gemeld. Controleer de gateway-telefoon.")
+            elif not storing and c.execute("UPDATE instelling SET value='0' WHERE key='storing_gemeld' AND value='1'").rowcount:
+                c.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)", (nu(app), None, "gateway hersteld"))
+                c.commit()
+                if url:
+                    stuur_melding(url, "SBL Portaal: hersteld", "De sms-gateway meldt zich weer.")
+
+    app.bewaak_gateway = bewaak_gateway
+
+    def start_bewaking():
+        def lus():
+            while True:
+                time.sleep(30)
+                try:
+                    bewaak_gateway()
+                except Exception as e:
+                    app.logger.warning("Bewaking fout: %s", e)
+        threading.Thread(target=lus, daemon=True).start()
+
+    if not app.config.get("TESTING") and os.environ.get("SBL_BEWAKING", "1") == "1":
+        start_bewaking()
 
     # ---------- portaal (beheerder + coordinator) ----------
     @app.get("/portaal")
@@ -236,7 +363,7 @@ def create_app(config=None):
                                 WHERE b.status='klaar' ORDER BY b.klaar_op DESC LIMIT 20""").fetchall()
         adviesnrs = {r["id"]: r["nummer"] for r in routes()}
         return render_template("portaal.html", nieuw=nieuw, onderweg=onderweg, klaar=klaar,
-                               routes=routes(), adviesnrs=adviesnrs, storing=gateway_storing())
+                               routes=routes(), adviesnrs=adviesnrs)
 
     @app.post("/bericht/<int:bid>/route")
     @rol_vereist("beheerder", "coordinator")
@@ -307,7 +434,8 @@ def create_app(config=None):
         return render_template("beheer.html",
                                n_routes=db().execute("SELECT COUNT(*) c FROM route").fetchone()["c"],
                                n_sb=db().execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
-                               sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"))
+                               sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
+                               notificatie_url=instelling("notificatie_url"))
 
     @app.post("/beheer/routes")
     @rol_vereist("beheerder")
@@ -337,6 +465,9 @@ def create_app(config=None):
         if request.form.get("nieuwe_sleutel"):
             zet_instelling("sms_sleutel", secrets.token_urlsafe(24))
             audit("sms-sleutel vernieuwd")
+        url = request.form.get("notificatie_url", "").strip()
+        if url == "" or url.startswith(("https://", "http://")):
+            zet_instelling("notificatie_url", url)
         s = request.form.get("storing_seconden", type=int)
         if s and 60 <= s <= 86400:
             zet_instelling("storing_seconden", s)
