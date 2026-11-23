@@ -616,9 +616,14 @@ def create_app(config=None):
     @app.get("/routes")
     @rol_vereist("beheerder", "coordinator")
     def routes_overzicht():
-        rows = db().execute("""SELECT r.*, (SELECT COUNT(*) FROM bericht b WHERE b.route_id=r.id AND b.status IN ('toegewezen','onderweg')) AS open
-                               FROM route r ORDER BY r.nummer""").fetchall()
-        return render_template("routes.html", rows=rows)
+        def tel(st, extra=""):
+            return f"(SELECT COUNT(*) FROM bericht b WHERE b.route_id=r.id AND b.status='{st}'{extra})"
+        rows = db().execute(f"""SELECT r.*, {tel('toegewezen')} AS wacht, {tel('onderweg')} AS onderweg,
+                               {tel('klaar', " AND substr(b.klaar_op,1,10)=?")} AS klaar
+                               FROM route r ORDER BY r.nummer""", (nu(app)[:10],)).fetchall()
+        nieuw = db().execute("SELECT COUNT(*) c FROM bericht WHERE status='nieuw'").fetchone()["c"]
+        return render_template("routes.html", rows=rows, nieuw=nieuw,
+                               accepteren=instelling("accepteren_verplicht", "0") == "1")
 
     # ---------- beheer ----------
     @app.get("/beheer")
