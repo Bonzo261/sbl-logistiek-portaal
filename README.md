@@ -23,6 +23,8 @@ Open `http://localhost:8000`, maak het eerste beheerdersaccount aan en stel onde
 
 Zonder Docker: `pip install -r requirements.txt && gunicorn -b 0.0.0.0:8000 wsgi:app` (of `flask --app wsgi run` om te ontwikkelen).
 
+**Achter een reverse proxy:** zet `SBL_PROXY=1` zodat het echte IP-adres (voor de inlogblokkade) en `https` worden herkend. Zet dit alleen aan als de app niet rechtstreeks bereikbaar is.
+
 **Productie:** zet de app achter een reverse proxy met HTTPS (bijv. Caddy of nginx) en maak regelmatig een back-up van `data/sbl.db`. De beheerder van de installatie is zelf verantwoordelijk voor beheer, updates en back-ups.
 
 ## Import

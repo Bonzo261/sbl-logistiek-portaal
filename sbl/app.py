@@ -10,6 +10,7 @@ from datetime import datetime
 from functools import wraps
 from zoneinfo import ZoneInfo
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -39,6 +40,8 @@ def create_app(config=None):
     )
     if config:
         app.config.update(config)
+    if os.environ.get("SBL_PROXY", "0") == "1":  # achter een reverse proxy (Plesk/nginx/Caddy)
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     if not app.config["SECRET_KEY"]:
         # Vaste sleutel in de database zodat sessies een herstart overleven.
         app.config["SECRET_KEY"] = "tijdelijk"
