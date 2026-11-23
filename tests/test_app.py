@@ -685,3 +685,13 @@ def test_logo_en_favicon(client):
         assert client.get("/static/" + f).status_code == 200
     login = client.get("/login").get_data(as_text=True)
     assert "favicon.svg" in login and "logo.svg" in login and "StemBureauLogistiek" in login
+
+
+def test_huisstijl_bestanden(client):
+    css = client.get("/static/stijl.css").get_data(as_text=True)
+    assert "--marine:#0b2a5b" in css and "--oranje:#ff7a1a" in css
+    fonts = client.get("/static/fonts.css").get_data(as_text=True)
+    assert "FiraSans-Regular.woff" in fonts
+    for f in ("FiraSans-Regular.woff", "FiraSans-Medium.woff", "FiraSans-Bold.woff", "OFL-FiraSans.txt"):
+        assert client.get("/static/fonts/" + f).status_code == 200
+    assert "stijl.css" in client.get("/login").get_data(as_text=True) and "fonts.css" in client.get("/login").get_data(as_text=True)

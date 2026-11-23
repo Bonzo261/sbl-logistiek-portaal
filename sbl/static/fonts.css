@@ -1,0 +1,4 @@
+/* Fira Sans (SIL Open Font License 1.1, zie fonts/OFL-FiraSans.txt), zelf gehost zodat er geen externe verzoeken nodig zijn. */
+@font-face{font-family:"Fira Sans";font-weight:400;font-style:normal;font-display:swap;src:url("fonts/FiraSans-Regular.woff") format("woff")}
+@font-face{font-family:"Fira Sans";font-weight:500;font-style:normal;font-display:swap;src:url("fonts/FiraSans-Medium.woff") format("woff")}
+@font-face{font-family:"Fira Sans";font-weight:700;font-style:normal;font-display:swap;src:url("fonts/FiraSans-Bold.woff") format("woff")}
