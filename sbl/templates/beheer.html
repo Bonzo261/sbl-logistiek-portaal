@@ -26,6 +26,6 @@ Heartbeat (GET of POST): <code>{{ request.url_root }}api/heartbeat?sleutel={{ sl
 <label>Wachtwoord <input type="password" name="wachtwoord" placeholder="{{ '(ingesteld – leeg laten om te behouden)' if mail.wachtwoord else '' }}" autocomplete="new-password"></label>
 {% if mail.wachtwoord %}<label class="klein"><input type="checkbox" name="wachtwoord_wissen" value="1"> wachtwoord wissen</label>{% endif %}</div>
 <div class="rij" style="margin-top:.5rem"><label>Afzenderadres <input name="van" type="email" value="{{ mail.van }}" placeholder="noreply@voorbeeld.nl"></label>
-<label>Webadres van deze site <input name="publieke_url" value="{{ mail.publieke_url or request.url_root.rstrip('/') }}" size="30"></label></div>
+<label>Webadres van deze site (verplicht) <input name="publieke_url" value="{{ mail.publieke_url }}" placeholder="https://portaal.jouwgemeente.nl" size="32"></label></div>
 <p class="rij" style="margin-top:.8rem"><button>Opslaan</button><button name="testmail" value="1" class="groen">Opslaan en testmail naar mezelf</button></p></form></div>
 {% endblock %}
