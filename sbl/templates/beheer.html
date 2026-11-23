@@ -12,5 +12,6 @@ Veldnaam met de tekst: <code>message</code> (ook <code>text</code>/<code>body</c
 Heartbeat (GET of POST): <code>{{ request.url_root }}api/heartbeat?sleutel={{ sleutel }}</code></p>
 <form method="post" action="{{ url_for('beheer_instellingen') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
 <label>Storing na <input type="number" name="storing_seconden" min="60" value="{{ storing_s }}"> seconden</label>
+<label>Meldings-URL (bijv. ntfy-topic) <input name="notificatie_url" value="{{ notificatie_url }}" placeholder="https://ntfy.sh/mijn-geheime-topic" size="38"></label>
 <label><input type="checkbox" name="nieuwe_sleutel" value="1"> nieuwe sleutel genereren</label><button>Opslaan</button></form></div>
 {% endblock %}
