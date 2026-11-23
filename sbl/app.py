@@ -627,7 +627,7 @@ def create_app(config=None):
             abort(404)
         items = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
-                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.onderweg_op""", (route_id,)).fetchall()
+                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY COALESCE(b.geaccepteerd_op, b.onderweg_op), b.id""", (route_id,)).fetchall()
         laatste_melding = db().execute("SELECT COALESCE(MAX(id),0) m FROM route_melding WHERE route_id=?", (route_id,)).fetchone()["m"]
         return render_template("route.html", route=route, items=items, laatste_melding=laatste_melding,
                                melding=instelling("melding_chauffeur", "1") == "1")

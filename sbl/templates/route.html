@@ -7,6 +7,7 @@
  <form method="post" action="{{ url_for('bericht_accepteer', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('route_pagina', route_id=route.id) }}"><p><button class="groen" style="font-size:1.2rem;padding:.8rem 1.4rem">✔ Accepteren – ik ga erheen</button></p></form>
 </div>{% endfor %}
 {% for b in items if b.status == 'onderweg' %}{% if loop.first and items|selectattr('status','eq','toegewezen')|list %}<h2>Onderweg</h2>{% endif %}<div class="kaart">
+ <span class="klein">{% if items|selectattr('status','eq','onderweg')|list|length > 1 %}<b>Volgorde {{ loop.index }}</b> · {% endif %}geaccepteerd om {{ (b.geaccepteerd_op or b.onderweg_op or '')[11:16] }}</span><br>
  <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong><br>{{ b.adres }}<br>
  <p class="rij"><a class="knop" href="tel:{{ b.telefoon|replace(' ','') }}">📞 Bel voorzitter stembureau-{{ b.sb_nummer }}</a>
  <a class="knop grijs" href="https://www.google.com/maps/dir/?api=1&destination={{ b.adres|urlencode }}">Navigeer</a>

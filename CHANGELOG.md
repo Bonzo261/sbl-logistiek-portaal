@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Routepagina: opdrachten onderweg staan op volgorde van acceptatie, met "Volgorde 1, 2, …" en het tijdstip van acceptatie
 - Handleidingen in `docs/`: installatie, beheerder, coördinator en chauffeur
 - Logboek: filteren op type (gateway, berichten, inloggen en account, gebruikers, stembureaus en routes, instellingen, back-up)
 - Beheer: gateway-status (verbonden, storing of nog geen heartbeat) met tijdstip van laatste heartbeat en laatste sms
