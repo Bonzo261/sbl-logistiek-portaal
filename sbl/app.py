@@ -198,6 +198,7 @@ def create_app(config=None):
         geheim = session.get("nieuw_totp")
         return render_template("account.html", geheim=geheim,
                                uri=totp.uri(geheim, g.gebruiker["naam"]) if geheim else None,
+                               qr=totp.qr_svg(totp.uri(geheim, g.gebruiker["naam"])) if geheim else None,
                                verplicht=app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur")
 
     @app.post("/account/2fa/start")

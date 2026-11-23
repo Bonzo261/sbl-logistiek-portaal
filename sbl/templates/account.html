@@ -4,7 +4,8 @@
 {% else %}
  {% if verplicht %}<p><strong>Voor jouw rol is tweestapsverificatie verplicht.</strong> Stel het eerst in.</p>{% endif %}
  {% if geheim %}
-  <p>1. Voeg dit account toe in een authenticator-app (bijv. Google Authenticator, Aegis of Microsoft Authenticator). Op een telefoon kun je op deze link tikken: <a href="{{ uri }}">toevoegen in app</a>.</p>
+  <p>1. Voeg dit account toe in een authenticator-app (bijv. Google Authenticator, Aegis of Microsoft Authenticator). Scan de QR-code, of tik op een telefoon op deze link: <a href="{{ uri }}">toevoegen in app</a>.</p>
+  {% if qr %}<p><img src="{{ qr }}" alt="QR-code voor authenticator-app" width="200" height="200"></p>{% endif %}
   <p>Of voer deze sleutel handmatig in:<br><code style="font-size:1.1rem;word-break:break-all">{{ geheim }}</code></p>
   <form method="post" action="{{ url_for('tweefa_bevestig') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
   <label>2. Code uit de app: <input name="code" inputmode="numeric" maxlength="7" required></label><button class="groen">Inschakelen</button></form>

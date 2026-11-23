@@ -31,3 +31,12 @@ def controleer(geheim, invoer, laatste=0, nu=None):
 
 def uri(geheim, naam, uitgever="SBL Portaal"):
     return f"otpauth://totp/{quote(uitgever)}:{quote(naam)}?secret={geheim}&issuer={quote(uitgever)}"
+
+
+def qr_svg(tekst):
+    """QR-code als data-URI (SVG). Geeft None als de bibliotheek 'segno' ontbreekt."""
+    try:
+        import segno
+    except ImportError:
+        return None
+    return segno.make(tekst, error="m").svg_data_uri(scale=5, border=2)
