@@ -26,6 +26,17 @@ def nu(app=None):
     return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def migreer(c):
+    """Maakt tabellen/kolommen aan; veilig om herhaald uit te voeren (ook na herstel van een oude back-up)."""
+    c.executescript(open(os.path.join(HIER, "schema.sql")).read())
+    kolommen = {k[1] for k in c.execute("PRAGMA table_info(gebruiker)")}
+    for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0"),
+                     ("herstel", "TEXT NOT NULL DEFAULT '[]'")):
+        if kol not in kolommen:
+            c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
+    c.commit()
+
+
 def create_app(config=None):
     app = Flask(__name__)
     app.config.update(
@@ -36,7 +47,7 @@ def create_app(config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SBL_HTTPS", "0") == "1",
-        MAX_CONTENT_LENGTH=2 * 1024 * 1024,
+        MAX_CONTENT_LENGTH=50 * 1024 * 1024,
     )
     if config:
         app.config.update(config)
@@ -46,11 +57,7 @@ def create_app(config=None):
         # Vaste sleutel in de database zodat sessies een herstart overleven.
         app.config["SECRET_KEY"] = "tijdelijk"
     with sqlite3.connect(app.config["DATABASE"]) as c:
-        c.executescript(open(os.path.join(HIER, "schema.sql")).read())
-        kolommen = {k[1] for k in c.execute("PRAGMA table_info(gebruiker)")}
-        for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0")):
-            if kol not in kolommen:
-                c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
+        migreer(c)
         r = c.execute("SELECT value FROM instelling WHERE key='secret_key'").fetchone()
         if not r:
             c.execute("INSERT INTO instelling VALUES ('secret_key', ?)", (secrets.token_hex(32),))
@@ -110,7 +117,7 @@ def create_app(config=None):
                 session.clear()
             elif (app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur"
                   and not g.gebruiker["totp_geheim"]
-                  and request.endpoint not in ("account", "tweefa_start", "tweefa_bevestig", "logout", "static")):
+                  and request.endpoint not in ("account", "tweefa_start", "tweefa_bevestig", "wachtwoord_wijzigen", "logout", "static")):
                 return redirect(url_for("account"))
 
     def rol_vereist(*rollen):
@@ -173,6 +180,19 @@ def create_app(config=None):
         audit("inloggen")
         return redirect(nxt or url_for("start"))
 
+    def herstel_hash(code):
+        norm = "".join(ch for ch in code.upper() if ch.isalnum())
+        import hashlib
+        import hmac as _hmac
+        return _hmac.new(app.config["SECRET_KEY"].encode(), norm.encode(), hashlib.sha256).hexdigest()
+
+    def nieuwe_herstelcodes(uid):
+        codes = ["-".join(("".join(secrets.choice("ABCDEFGHJKMNPQRSTUVWXYZ23456789") for _ in range(10)))[i:i + 5]
+                          for i in (0, 5)) for _ in range(8)]
+        db().execute("UPDATE gebruiker SET herstel=? WHERE id=?",
+                     (json.dumps([herstel_hash(c) for c in codes]), uid))
+        return codes
+
     @app.route("/login/2fa", methods=["GET", "POST"])
     def login_2fa():
         u = db().execute("SELECT * FROM gebruiker WHERE id=?", (session.get("pre_uid"),)).fetchone()
@@ -184,9 +204,20 @@ def create_app(config=None):
             sl = "n:" + u["naam"].lower()
             if db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel=?", (sl,)).fetchone()["c"] >= 10:
                 return render_template("login_2fa.html"), 429
-            teller = totp.controleer(u["totp_geheim"], request.form.get("code"), u["totp_laatst"])
-            if teller:
-                db().execute("UPDATE gebruiker SET totp_laatst=? WHERE id=?", (teller, u["id"]))
+            invoer = request.form.get("code", "")
+            teller = totp.controleer(u["totp_geheim"], invoer, u["totp_laatst"])
+            hersteld = False
+            if not teller:
+                lijst = json.loads(u["herstel"] or "[]")
+                h = herstel_hash(invoer)
+                if h in lijst:
+                    lijst.remove(h)
+                    db().execute("UPDATE gebruiker SET herstel=? WHERE id=?", (json.dumps(lijst), u["id"]))
+                    hersteld = True
+                    audit(f"herstelcode gebruikt door {u['naam']}")
+            if teller or hersteld:
+                if teller:
+                    db().execute("UPDATE gebruiker SET totp_laatst=? WHERE id=?", (teller, u["id"]))
                 nxt = session.get("pre_next", "")
                 session.clear()
                 return voltooi_login(u, nxt)
@@ -199,7 +230,8 @@ def create_app(config=None):
         if not g.gebruiker:
             return redirect(url_for("login"))
         geheim = session.get("nieuw_totp")
-        return render_template("account.html", geheim=geheim,
+        n_herstel = len(json.loads(g.gebruiker["herstel"] or "[]"))
+        return render_template("account.html", geheim=geheim, n_herstel=n_herstel,
                                uri=totp.uri(geheim, g.gebruiker["naam"]) if geheim else None,
                                qr=totp.qr_svg(totp.uri(geheim, g.gebruiker["naam"])) if geheim else None,
                                verplicht=app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur")
@@ -222,8 +254,46 @@ def create_app(config=None):
         db().execute("UPDATE gebruiker SET totp_geheim=?, totp_laatst=? WHERE id=?",
                      (session.pop("nieuw_totp"), teller, g.gebruiker["id"]))
         audit("2fa ingeschakeld")
-        flash("Tweestapsverificatie is ingeschakeld.")
-        return redirect(url_for("start"))
+        return render_template("herstelcodes.html", codes=nieuwe_herstelcodes(g.gebruiker["id"]))
+
+    @app.post("/account/2fa/herstelcodes")
+    def tweefa_nieuwe_codes():
+        if not g.gebruiker or not g.gebruiker["totp_geheim"]:
+            abort(403)
+        teller = totp.controleer(g.gebruiker["totp_geheim"], request.form.get("code"), g.gebruiker["totp_laatst"])
+        if not teller:
+            flash("Code onjuist; er zijn geen nieuwe herstelcodes gemaakt.")
+            return redirect(url_for("account"))
+        db().execute("UPDATE gebruiker SET totp_laatst=? WHERE id=?", (teller, g.gebruiker["id"]))
+        audit("nieuwe herstelcodes")
+        return render_template("herstelcodes.html", codes=nieuwe_herstelcodes(g.gebruiker["id"]))
+
+    @app.post("/account/wachtwoord")
+    def wachtwoord_wijzigen():
+        if not g.gebruiker:
+            abort(403)
+        f = request.form
+        if not check_password_hash(g.gebruiker["hash"], f.get("huidig", "")):
+            flash("Huidig wachtwoord klopt niet.")
+        elif len(f.get("nieuw", "")) < 10 or f.get("nieuw") != f.get("nieuw2"):
+            flash("Nieuw wachtwoord: minimaal 10 tekens en beide velden gelijk.")
+        else:
+            db().execute("UPDATE gebruiker SET hash=? WHERE id=?", (generate_password_hash(f["nieuw"]), g.gebruiker["id"]))
+            audit("wachtwoord gewijzigd")
+            flash("Wachtwoord gewijzigd.")
+        return redirect(url_for("account"))
+
+    @app.post("/beheer/gebruikers/<int:uid>/wachtwoord")
+    @rol_vereist("beheerder")
+    def gebruiker_wachtwoord(uid):
+        nieuw = request.form.get("nieuw", "")
+        if len(nieuw) < 10:
+            flash("Wachtwoord moet minimaal 10 tekens zijn.")
+        else:
+            db().execute("UPDATE gebruiker SET hash=? WHERE id=?", (generate_password_hash(nieuw), uid))
+            audit(f"wachtwoord gereset voor gebruiker-id {uid}")
+            flash("Wachtwoord ingesteld.")
+        return redirect(url_for("beheer_gebruikers"))
 
     @app.post("/beheer/gebruikers/<int:uid>/reset2fa")
     @rol_vereist("beheerder")
@@ -576,6 +646,72 @@ def create_app(config=None):
             db().execute("DELETE FROM gebruiker WHERE id=?", (uid,))
             audit(f"gebruiker-id {uid} verwijderd")
         return redirect(url_for("beheer_gebruikers"))
+
+    @app.get("/beheer/backup")
+    @rol_vereist("beheerder")
+    def beheer_backup_pagina():
+        return render_template("backup.html")
+
+    @app.post("/beheer/backup/download")
+    @rol_vereist("beheerder")
+    def backup_download():
+        import tempfile
+        from flask import send_file
+        db().commit()
+        fd, pad = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        bron = sqlite3.connect(app.config["DATABASE"])
+        doel = sqlite3.connect(pad)
+        bron.backup(doel)
+        doel.close()
+        bron.close()
+        audit("back-up gedownload")
+        db().commit()
+        naam = "sbl-backup-" + nu(app).replace(" ", "_").replace(":", "") + ".db"
+        resp = send_file(pad, as_attachment=True, download_name=naam, mimetype="application/octet-stream")
+        resp.call_on_close(lambda: os.path.exists(pad) and os.remove(pad))
+        return resp
+
+    @app.post("/beheer/backup/herstel")
+    @rol_vereist("beheerder")
+    def backup_herstel():
+        import tempfile
+        f = request.files.get("bestand")
+        if request.form.get("bevestig", "").strip().upper() != "HERSTEL" or not f:
+            flash("Kies een bestand en typ HERSTEL om te bevestigen.")
+            return redirect(url_for("beheer_backup_pagina"))
+        fd, pad = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        try:
+            f.save(pad)
+            bron = sqlite3.connect(pad)
+            try:
+                ok = bron.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                tabellen = {r[0] for r in bron.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                ok = ok and {"route", "stembureau", "bericht", "gebruiker", "instelling"} <= tabellen
+                ok = ok and bron.execute("SELECT COUNT(*) FROM gebruiker WHERE rol='beheerder'").fetchone()[0] > 0
+            except sqlite3.DatabaseError:
+                ok = False
+            if not ok:
+                bron.close()
+                flash("Dit is geen geldig back-upbestand (of er staat geen beheerder in).")
+                return redirect(url_for("beheer_backup_pagina"))
+            db().commit()
+            doel = sqlite3.connect(app.config["DATABASE"], timeout=30)
+            bron.backup(doel)
+            bron.close()
+            migreer(doel)
+            doel.execute("INSERT INTO instelling VALUES ('secret_key', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                         (app.config["SECRET_KEY"],))
+            doel.execute("INSERT INTO audit (tijd, gebruiker, actie) VALUES (?,?,?)",
+                         (nu(app), session.get("naam"), "back-up hersteld"))
+            doel.commit()
+            doel.close()
+        finally:
+            os.remove(pad)
+        session.clear()
+        flash("Back-up hersteld. Log opnieuw in.")
+        return redirect(url_for("login"))
 
     @app.get("/beheer/audit")
     @rol_vereist("beheerder")

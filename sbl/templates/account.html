@@ -1,6 +1,8 @@
 {% extends "basis.html" %}{% block inhoud %}<h1>Mijn account</h1>
 <div class="kaart"><h2>Tweestapsverificatie</h2>
-{% if gebruiker.totp_geheim %}<p>✅ Ingeschakeld.</p>
+{% if gebruiker.totp_geheim %}<p>✅ Ingeschakeld. Nog {{ n_herstel }} herstelcode(s) beschikbaar.</p>
+<form method="post" action="{{ url_for('tweefa_nieuwe_codes') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<label>Nieuwe herstelcodes maken (oude vervallen) – code uit app: <input name="code" inputmode="numeric" maxlength="7" required></label><button class="grijs">Maken</button></form>
 {% else %}
  {% if verplicht %}<p><strong>Voor jouw rol is tweestapsverificatie verplicht.</strong> Stel het eerst in.</p>{% endif %}
  {% if geheim %}
@@ -12,4 +14,9 @@
  {% else %}
   <form method="post" action="{{ url_for('tweefa_start') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button>Instellen</button></form>
  {% endif %}
-{% endif %}</div>{% endblock %}
+{% endif %}</div><div class="kaart"><h2>Wachtwoord wijzigen</h2>
+<form method="post" action="{{ url_for('wachtwoord_wijzigen') }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<p><input type="password" name="huidig" placeholder="Huidig wachtwoord" autocomplete="current-password" required></p>
+<p><input type="password" name="nieuw" placeholder="Nieuw (min. 10 tekens)" minlength="10" autocomplete="new-password" required></p>
+<p><input type="password" name="nieuw2" placeholder="Nieuw nogmaals" minlength="10" autocomplete="new-password" required></p>
+<button>Wijzigen</button></form></div>{% endblock %}
