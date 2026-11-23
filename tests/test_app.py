@@ -91,3 +91,12 @@ def test_import_formaten():
                       "telefoon": "0612345678", "route": 2}]
     csv_items, _ = importer.verwerk(importer.lees_rijen("v.csv", "Locatie,Staat,Huisnummer,Toevoeging,Postcode,Plaats,sbNummers,telefoonnummer,route\nSchool  A,Dorpsstraat,1,a,1234 AB,Dorp,5,0612345678,2\n".encode()))
     assert csv_items == items
+
+
+def test_login_geblokkeerd_na_tien_pogingen(client):
+    maak_admin(client)
+    post(client, "/logout", tokenurl="/beheer")
+    for _ in range(10):
+        post(client, "/login", {"naam": "admin", "wachtwoord": "fout"})
+    r = post(client, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
+    assert r.status_code == 429
