@@ -601,3 +601,27 @@ def test_waarschuwing_niet_geaccepteerd(client):
     assert c.get("/scherm/data.json").get_json()["routes"][0]["niveau"] == "rood"
     post(c, "/bericht/1/accepteer", tokenurl="/portaal")
     assert "Nog niet geaccepteerd" not in c.get("/portaal").get_data(as_text=True)
+
+
+def test_portaal_status_en_geluidinstelling(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "1"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "A", "adres": "x", "telefoon": "061", "route_id": "1"}, "/beheer/stembureaus")
+    s0 = c.get("/portaal/status.json").get_json()
+    assert s0["geluid"] is True and s0["nieuwste"] == 0  # standaard aan
+    c.post(f"/api/sms?sleutel={sleutel(c)}", json={"message": "5"})
+    s1 = c.get("/portaal/status.json").get_json()
+    assert s1["nieuwste"] == 1 and s1["handtekening"] != s0["handtekening"]
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    s2 = c.get("/portaal/status.json").get_json()
+    assert s2["handtekening"] != s1["handtekening"] and s2["nieuwste"] == 1  # wijziging, maar geen nieuw bericht
+    assert c.get("/portaal/status.json").get_json()["handtekening"] == s2["handtekening"]  # stabiel
+    # uitschakelen in beheer
+    post(c, "/beheer/werkwijze", {"accepteer_drempel": "5"}, "/beheer")
+    assert c.get("/portaal/status.json").get_json()["geluid"] is False
+    assert "geluidknop" in c.get("/portaal").get_data(as_text=True)  # knop blijft in pagina, JS verbergt hem
+    post(c, "/beheer/werkwijze", {"geluid_nieuw": "1"}, "/beheer")
+    assert c.get("/portaal/status.json").get_json()["geluid"] is True
+    # alleen voor coördinator/beheerder
+    assert c.application.test_client().get("/portaal/status.json").status_code == 302

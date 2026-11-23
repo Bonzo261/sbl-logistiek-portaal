@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Geluidssignaal in het portaal bij een nieuw bericht (aan/uit in *Beheer → Werkwijze*; per apparaat aan/uit met een knop). Het portaal ververst nu zonder de pagina te herladen
 - Optionele acceptatie door de chauffeur (*Beheer → Werkwijze*): toegewezen opdrachten wachten op acceptatie en kunnen tot dat moment door de coördinator naar een andere route verplaatst worden; ook zichtbaar op het overzichtsscherm; waarschuwing (oranje/rood, instelbaar) als een opdracht te lang niet geaccepteerd is, in het portaal en op het overzichtsscherm
 - Overzichtsscherm voor de wand (`/scherm`) met kleurcodering op wachttijd, instelbare drempel en optionele geheime link zonder login (zonder adressen en telefoonnummers)
 - Automatische dagelijkse back-up (vanaf 03:00) met bewaartermijn, lijst, download en herstel vanuit het scherm; mislukte back-ups worden gemeld

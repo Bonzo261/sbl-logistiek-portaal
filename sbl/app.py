@@ -484,7 +484,22 @@ def create_app(config=None):
                                 WHERE b.status='klaar' ORDER BY b.klaar_op DESC LIMIT 20""").fetchall()
         adviesnrs = {r["id"]: r["nummer"] for r in routes()}
         return render_template("portaal.html", nieuw=nieuw, onderweg=onderweg, toegewezen=toegewezen, klaar=klaar,
+                               nieuwste=db().execute("SELECT COALESCE(MAX(id),0) m FROM bericht").fetchone()["m"],
+                               geluid=instelling("geluid_nieuw", "1") == "1",
                                routes=routes(), adviesnrs=adviesnrs)
+
+    @app.get("/portaal/status.json")
+    @rol_vereist("beheerder", "coordinator")
+    def portaal_status():
+        rijen = db().execute("SELECT id, status, route_id FROM bericht WHERE status!='klaar' ORDER BY id").fetchall()
+        klaar = db().execute("SELECT COUNT(*) c, COALESCE(MAX(id),0) m FROM bericht WHERE status='klaar'").fetchone()
+        handtekening = hashlib.sha1(
+            (";".join(f"{r['id']}:{r['status']}:{r['route_id']}" for r in rijen) + f"|{klaar['c']}:{klaar['m']}").encode()).hexdigest()
+        nieuw_max = db().execute("SELECT COALESCE(MAX(id),0) m FROM bericht").fetchone()["m"]
+        resp = jsonify(handtekening=handtekening, nieuwste=nieuw_max, geluid=instelling("geluid_nieuw", "1") == "1",
+                       storing=gateway_storing())
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.post("/bericht/<int:bid>/route")
     @rol_vereist("beheerder", "coordinator")
@@ -583,7 +598,7 @@ def create_app(config=None):
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
-                               accepteren=instelling("accepteren_verplicht", "0") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
+                               accepteren=instelling("accepteren_verplicht", "0") == "1", geluid=instelling("geluid_nieuw", "1") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
                                scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
     @app.post("/beheer/routes")
@@ -1107,6 +1122,7 @@ def create_app(config=None):
     def beheer_werkwijze():
         aan = "1" if request.form.get("accepteren_verplicht") else "0"
         zet_instelling("accepteren_verplicht", aan)
+        zet_instelling("geluid_nieuw", "1" if request.form.get("geluid_nieuw") else "0")
         d = request.form.get("accepteer_drempel", type=int)
         if d and 1 <= d <= 120:
             zet_instelling("accepteer_drempel", d)
