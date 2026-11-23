@@ -1,8 +1,8 @@
 {% extends "basis.html" %}{% block inhoud %}<h1>Stembureaus importeren</h1>
 {% if voorbeeld is none %}
 <form method="post" enctype="multipart/form-data" class="kaart"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
-<p>Kies een .csv- of .xlsx-bestand met een kopregel. Herkende kolommen: <em>nummer, naam (of locatie), adres (of straat/huisnummer/toevoeging/postcode/plaats), telefoon, route</em>.</p>
-<input type="file" name="bestand" accept=".csv,.xlsx" required> <button>Voorbeeld tonen</button></form>
+<p>Kies een .csv-, .xlsx- of .ods-bestand met een kopregel. Herkende kolommen: <em>nummer, naam (of locatie), adres (of straat/huisnummer/toevoeging/postcode/plaats), telefoon, route</em>.</p>
+<input type="file" name="bestand" accept=".csv,.xlsx,.ods" required> <button>Voorbeeld tonen</button></form>
 {% else %}
 <div class="kaart"><strong>{{ voorbeeld|length }} stembureaus gevonden</strong> ({{ nieuw }} nieuw, {{ voorbeeld|length - nieuw }} bestaand worden bijgewerkt).</div>
 {% for f in fouten %}<div class="flash">{{ f }}</div>{% endfor %}

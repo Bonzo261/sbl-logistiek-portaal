@@ -79,3 +79,15 @@ def test_heartbeat(client):
     maak_admin(client)
     k = sleutel(client)
     assert client.get(f"/api/heartbeat?sleutel={k}").get_json()["ok"]
+
+
+def test_import_formaten():
+    import os
+    from sbl import importer
+    pad = os.path.join(os.path.dirname(__file__), "voorbeeld.ods")
+    items, fouten = importer.verwerk(importer.lees_rijen("v.ods", open(pad, "rb").read()))
+    assert not fouten
+    assert items == [{"nummer": 5, "naam": "School A", "adres": "Dorpsstraat 1a, 1234 AB Dorp",
+                      "telefoon": "0612345678", "route": 2}]
+    csv_items, _ = importer.verwerk(importer.lees_rijen("v.csv", "Locatie,Staat,Huisnummer,Toevoeging,Postcode,Plaats,sbNummers,telefoonnummer,route\nSchool  A,Dorpsstraat,1,a,1234 AB,Dorp,5,0612345678,2\n".encode()))
+    assert csv_items == items
