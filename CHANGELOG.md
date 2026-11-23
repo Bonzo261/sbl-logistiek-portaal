@@ -1,0 +1,31 @@
+# Changelog
+
+Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); de versies zijn nog niet getagd.
+
+## [Niet uitgebracht]
+
+### Toegevoegd
+- Bulk aanmaken van chauffeursaccounts per route (`route1`, `route2`, …) met een uniek tijdelijk wachtwoord; printbare lijst die één keer getoond wordt
+- Verplichte wachtwoordwijziging bij de eerste login voor bulk-accounts en na een wachtwoordreset door de beheerder
+- Back-up downloaden en herstellen vanuit de webinterface
+- Herstelcodes (8, eenmalig) voor tweestapsverificatie
+- Wachtwoord wijzigen door de gebruiker; wachtwoord resetten door de beheerder
+- Terugknoppen in het beheer en slepen-en-neerzetten bij het importeren
+- Optie `SBL_PROXY` voor gebruik achter een reverse proxy
+- GitHub Action die na geslaagde tests een Docker-image naar Docker Hub publiceert
+- QR-code bij het instellen van 2FA (`segno`)
+
+## [0.1.0] – 2026-11-23
+Eerste versie, losgemaakt van Home Assistant.
+
+### Toegevoegd
+- Datamodel voor stembureaus, routes, berichten, gebruikers en instellingen (SQLite)
+- Rollen beheerder, coördinator en chauffeur; chauffeur gekoppeld aan één route
+- Sms-webhook, route-advies, portaal (Nieuw → Onderweg → Klaar) en routepagina met bel- en navigatieknop
+- Beheer: aantal routes, stembureaus en gebruikers, logboek
+- Import van stembureaus uit `.csv`, `.xlsx` en `.ods` met voorbeeld en validatie
+- Bon afdrukken via de browser
+- Tweestapsverificatie (TOTP), verplicht voor beheerder en coördinator; inlogblokkade na 10 mislukte pogingen
+- Gateway-heartbeat met storingsbalk en melding via een meldings-URL (bijv. ntfy)
+- Dockerfile, docker-compose, testset en GitHub Actions
+- Licentie AGPL-3.0-or-later

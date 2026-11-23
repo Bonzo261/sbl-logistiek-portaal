@@ -6,4 +6,5 @@ services:
     volumes: ["./data:/data"]
     environment:
       SBL_HTTPS: "1"   # zet op 0 als je (tijdelijk) zonder HTTPS test
+      SBL_PROXY: "1"   # alleen aan achter een reverse proxy; zet poort dan op 127.0.0.1:8000
       SBL_TIJDZONE: "Europe/Amsterdam"
