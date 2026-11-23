@@ -518,3 +518,59 @@ def test_overzichtsscherm(client):
     ch = c.application.test_client()
     post(ch, "/login", {"naam": "ch", "wachtwoord": "chauffeur1234"})
     assert ch.get("/scherm/data.json").status_code == 403
+
+
+def test_acceptatie_door_chauffeur_en_verplaatsen(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "2"}, "/beheer")
+    post(c, "/beheer/stembureaus/opslaan", {"nummer": "5", "naam": "School A", "adres": "Dorpsstraat 1", "telefoon": "0611111111", "route_id": "1"}, "/beheer/stembureaus")
+    post(c, "/beheer/gebruikers/bulk", {"voorvoegsel": "r", "route_id": ["1", "2"]}, "/beheer/gebruikers/bulk")
+    # zet tijdelijke wachtwoorden om naar bruikbare accounts via admin-reset
+    ids = re.findall(r'class="sel" name="uid" value="(\d+)"', c.get("/beheer/gebruikers").get_data(as_text=True))
+    for i, uid in enumerate(ids):
+        post(c, f"/beheer/gebruikers/{uid}/wachtwoord", {"nieuw": f"chauffeur-wachtwoord{i}"}, "/beheer/gebruikers")
+
+    def chauffeur(naam, ww):
+        k = c.application.test_client()
+        post(k, "/login", {"naam": naam, "wachtwoord": ww})
+        post(k, "/account/wachtwoord", {"huidig": ww, "nieuw": ww + "x", "nieuw2": ww + "x"}, "/account/nieuw-wachtwoord")
+        return k
+    ch1, ch2 = chauffeur("r1", "chauffeur-wachtwoord0"), chauffeur("r2", "chauffeur-wachtwoord1")
+
+    # uit (standaard): direct onderweg, geen acceptatie nodig
+    k = sleutel(c)
+    c.post(f"/api/sms?sleutel={k}", json={"message": "5"})
+    post(c, "/bericht/1/route", {"route_id": "1"}, "/portaal")
+    assert "Bel voorzitter" in ch1.get("/route/1").get_data(as_text=True)
+    post(c, "/bericht/1/klaar", tokenurl="/portaal")
+
+    # aan: eerst toegewezen
+    post(c, "/beheer/werkwijze", {"accepteren_verplicht": "1"}, "/beheer")
+    c.post(f"/api/sms?sleutel={k}", json={"message": "5"})
+    post(c, "/bericht/2/route", {"route_id": "1"}, "/portaal")
+    pagina = ch1.get("/route/1").get_data(as_text=True)
+    assert "Accepteren" in pagina and "Bel voorzitter" not in pagina
+    assert "Wacht op acceptatie (1)" in c.get("/portaal").get_data(as_text=True)
+    # klaarmelden zonder acceptatie kan niet
+    post(ch1, "/bericht/2/klaar", tokenurl="/route/1")
+    assert "Accepteren" in ch1.get("/route/1").get_data(as_text=True)
+    # coördinator verplaatst naar route 2
+    post(c, "/bericht/2/route", {"route_id": "2"}, "/portaal")
+    assert "Accepteren" not in ch1.get("/route/1").get_data(as_text=True)
+    assert "Accepteren" in ch2.get("/route/2").get_data(as_text=True)
+    # chauffeur van de verkeerde route mag niet accepteren
+    assert post(ch1, "/bericht/2/accepteer", tokenurl="/route/1").status_code == 403
+    # juiste chauffeur accepteert: nu onderweg met bel-knop
+    post(ch2, "/bericht/2/accepteer", tokenurl="/route/2")
+    pagina = ch2.get("/route/2").get_data(as_text=True)
+    assert "Bel voorzitter stembureau-5" in pagina
+    # geaccepteerd: verplaatsen niet meer mogelijk
+    r = post(c, "/bericht/2/route", {"route_id": "1"}, "/portaal", follow_redirects=True)
+    assert "al geaccepteerd" in r.get_data(as_text=True)
+    assert "Bel voorzitter" in ch2.get("/route/2").get_data(as_text=True)
+    # uitzetten: wachtende opdrachten gaan direct onderweg
+    c.post(f"/api/sms?sleutel={k}", json={"message": "5"})
+    post(c, "/bericht/3/route", {"route_id": "1"}, "/portaal")
+    post(c, "/beheer/werkwijze", {}, "/beheer")
+    assert "Bel voorzitter" in ch1.get("/route/1").get_data(as_text=True)

@@ -40,6 +40,8 @@ def migreer(c):
                      ("sessie_versie", "INTEGER NOT NULL DEFAULT 0")):
         if kol not in kolommen:
             c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
+    if "geaccepteerd_op" not in {k[1] for k in c.execute("PRAGMA table_info(bericht)")}:
+        c.execute("ALTER TABLE bericht ADD COLUMN geaccepteerd_op TEXT")
     c.commit()
 
 
@@ -470,12 +472,13 @@ def create_app(config=None):
                                WHERE b.status!='klaar' ORDER BY b.ontvangen""").fetchall()
         nieuw = [r for r in rows if r["status"] == "nieuw"]
         onderweg = [r for r in rows if r["status"] == "onderweg"]
+        toegewezen = [r for r in rows if r["status"] == "toegewezen"]
         klaar = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, r.nummer AS route_nummer
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                 LEFT JOIN route r ON r.id=b.route_id
                                 WHERE b.status='klaar' ORDER BY b.klaar_op DESC LIMIT 20""").fetchall()
         adviesnrs = {r["id"]: r["nummer"] for r in routes()}
-        return render_template("portaal.html", nieuw=nieuw, onderweg=onderweg, klaar=klaar,
+        return render_template("portaal.html", nieuw=nieuw, onderweg=onderweg, toegewezen=toegewezen, klaar=klaar,
                                routes=routes(), adviesnrs=adviesnrs)
 
     @app.post("/bericht/<int:bid>/route")
@@ -484,10 +487,35 @@ def create_app(config=None):
         route_id = request.form.get("route_id", type=int)
         if not db().execute("SELECT 1 FROM route WHERE id=?", (route_id,)).fetchone():
             abort(400, "Onbekende route")
-        db().execute("UPDATE bericht SET status='onderweg', route_id=?, onderweg_op=? WHERE id=? AND status='nieuw'",
-                     (route_id, nu(app), bid))
-        audit(f"bericht {bid} naar route-id {route_id}")
+        if instelling("accepteren_verplicht", "0") == "1":
+            # nieuw of nog niet geaccepteerd: (opnieuw) toewijzen; de chauffeur moet nog accepteren
+            n = db().execute("UPDATE bericht SET status='toegewezen', route_id=?, onderweg_op=?, geaccepteerd_op=NULL "
+                             "WHERE id=? AND status IN ('nieuw','toegewezen')", (route_id, nu(app), bid)).rowcount
+        else:
+            n = db().execute("UPDATE bericht SET status='onderweg', route_id=?, onderweg_op=? WHERE id=? AND status='nieuw'",
+                             (route_id, nu(app), bid)).rowcount
+        if not n:
+            flash("Dit bericht kan niet (meer) verplaatst worden: de chauffeur heeft het al geaccepteerd of het is klaar.")
+        else:
+            audit(f"bericht {bid} naar route-id {route_id}")
         return redirect(url_for("portaal"))
+
+    @app.post("/bericht/<int:bid>/accepteer")
+    @rol_vereist("beheerder", "coordinator", "chauffeur")
+    def bericht_accepteer(bid):
+        b = db().execute("SELECT * FROM bericht WHERE id=?", (bid,)).fetchone()
+        if not b:
+            abort(404)
+        if g.gebruiker["rol"] == "chauffeur" and b["route_id"] != g.gebruiker["route_id"]:
+            abort(403)
+        n = db().execute("UPDATE bericht SET status='onderweg', geaccepteerd_op=? WHERE id=? AND status='toegewezen'",
+                         (nu(app), bid)).rowcount
+        if n:
+            audit(f"bericht {bid} geaccepteerd")
+        else:
+            flash("Deze opdracht is niet meer beschikbaar om te accepteren (verplaatst of al geaccepteerd).")
+        terug = request.form.get("terug", "")
+        return redirect(terug if terug.startswith("/") and not terug.startswith("//") else url_for("start"))
 
     @app.post("/bericht/<int:bid>/klaar")
     @rol_vereist("beheerder", "coordinator", "chauffeur")
@@ -530,13 +558,13 @@ def create_app(config=None):
             abort(404)
         items = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
                                 FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
-                                WHERE b.route_id=? AND b.status='onderweg' ORDER BY b.onderweg_op""", (route_id,)).fetchall()
+                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.onderweg_op""", (route_id,)).fetchall()
         return render_template("route.html", route=route, items=items)
 
     @app.get("/routes")
     @rol_vereist("beheerder", "coordinator")
     def routes_overzicht():
-        rows = db().execute("""SELECT r.*, (SELECT COUNT(*) FROM bericht b WHERE b.route_id=r.id AND b.status='onderweg') AS open
+        rows = db().execute("""SELECT r.*, (SELECT COUNT(*) FROM bericht b WHERE b.route_id=r.id AND b.status IN ('toegewezen','onderweg')) AS open
                                FROM route r ORDER BY r.nummer""").fetchall()
         return render_template("routes.html", rows=rows)
 
@@ -550,6 +578,7 @@ def create_app(config=None):
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
+                               accepteren=instelling("accepteren_verplicht", "0") == "1",
                                scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
     @app.post("/beheer/routes")
@@ -1030,11 +1059,12 @@ def create_app(config=None):
                                           LEFT JOIN stembureau s ON s.id=b.stembureau_id
                                           WHERE b.status='nieuw' ORDER BY b.ontvangen""")]
         per_route = {}
-        for r in db().execute("""SELECT b.route_id, b.onderweg_op, s.nummer, s.naam FROM bericht b
+        for r in db().execute("""SELECT b.route_id, b.onderweg_op, b.status, s.nummer, s.naam FROM bericht b
                                  LEFT JOIN stembureau s ON s.id=b.stembureau_id
-                                 WHERE b.status='onderweg' ORDER BY b.onderweg_op"""):
+                                 WHERE b.status IN ('toegewezen','onderweg') ORDER BY b.onderweg_op"""):
             per_route.setdefault(r["route_id"], []).append(
-                {"nr": r["nummer"], "naam": r["naam"] or "", "min": minuten_sinds(r["onderweg_op"])})
+                {"nr": r["nummer"], "naam": r["naam"] or "", "min": minuten_sinds(r["onderweg_op"]),
+                 "wacht": r["status"] == "toegewezen"})
         routes_uit = []
         for r in routes():
             items = per_route.get(r["id"], [])
@@ -1060,6 +1090,17 @@ def create_app(config=None):
         resp = jsonify(scherm_gegevens())
         resp.headers["Cache-Control"] = "no-store"
         return resp
+
+    @app.post("/beheer/werkwijze")
+    @rol_vereist("beheerder")
+    def beheer_werkwijze():
+        aan = "1" if request.form.get("accepteren_verplicht") else "0"
+        zet_instelling("accepteren_verplicht", aan)
+        if aan == "0":  # openstaande opdrachten die nog op acceptatie wachten gaan gewoon door
+            db().execute("UPDATE bericht SET status='onderweg' WHERE status='toegewezen'")
+        audit(f"acceptatie door chauffeur {'aan' if aan == '1' else 'uit'}")
+        flash("Werkwijze opgeslagen.")
+        return redirect(url_for("beheer"))
 
     @app.post("/beheer/scherm")
     @rol_vereist("beheerder")

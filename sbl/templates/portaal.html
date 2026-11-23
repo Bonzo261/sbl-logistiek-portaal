@@ -15,6 +15,16 @@
  <form method="post" action="{{ url_for('bericht_verwijder', bid=b.id) }}" onsubmit="return confirm('Verwijderen?')">
   <input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="grijs">Verwijderen</button></form>
 </div>{% else %}<p class="klein">Geen nieuwe berichten.</p>{% endfor %}
+{% if toegewezen %}<h2>Wacht op acceptatie ({{ toegewezen|length }})</h2>
+{% for b in toegewezen %}<div class="kaart">
+ <strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }} <span class="klein">· toegewezen {{ b.onderweg_op[11:16] }}</span><br><span class="klein">{{ b.adres }}</span>
+ <form method="post" action="{{ url_for('bericht_route', bid=b.id) }}" class="rij">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <select name="route_id">{% for r in routes %}<option value="{{ r.id }}" {% if r.id == b.route_id %}selected{% endif %}>Route {{ r.nummer }}</option>{% endfor %}</select>
+  <button>Verplaatsen</button>
+ </form>
+ <form method="post" action="{{ url_for('bericht_accepteer', bid=b.id) }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('portaal') }}"><button class="grijs">Namens chauffeur accepteren</button></form>
+</div>{% endfor %}{% endif %}
 <h2>Onderweg ({{ onderweg|length }})</h2>
 {% for b in onderweg %}<div class="kaart rij">
  <div><strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }}<br><span class="klein">{{ b.adres }}</span></div>
