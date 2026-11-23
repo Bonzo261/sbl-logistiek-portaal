@@ -11,6 +11,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 - [Beheerder](docs/HANDLEIDING-BEHEERDER.md)
 - [Coördinator](docs/HANDLEIDING-COORDINATOR.md)
 - [Chauffeur](docs/HANDLEIDING-CHAUFFEUR.md)
+- [Privacy en beveiliging](docs/PRIVACY-EN-BEVEILIGING.md)
 
 ## Functies
 **Werkproces**
