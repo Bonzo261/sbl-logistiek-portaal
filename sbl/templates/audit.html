@@ -1,0 +1,1 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Logboek</h1><table>{% for r in rows %}<tr><td>{{ r.tijd }}</td><td>{{ r.gebruiker }}</td><td>{{ r.actie }}</td></tr>{% endfor %}</table>{% endblock %}

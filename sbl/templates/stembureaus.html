@@ -1,0 +1,8 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Stembureaus</h1>
+<form method="post" action="{{ url_for('stembureau_opslaan') }}" class="kaart rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input name="nummer" type="number" placeholder="Nr" required style="width:5rem"><input name="naam" placeholder="Naam"><input name="adres" placeholder="Adres">
+<input name="telefoon" placeholder="Telefoon voorzitter"><select name="route_id"><option value="">Geen route</option>{% for r in routes %}<option value="{{ r.id }}">Route {{ r.nummer }}</option>{% endfor %}</select>
+<button>Toevoegen / bijwerken</button></form>
+<table><tr><th>Nr</th><th>Naam</th><th>Adres</th><th>Telefoon</th><th>Route</th><th></th></tr>
+{% for s in rows %}<tr><td>{{ s.nummer }}</td><td>{{ s.naam }}</td><td>{{ s.adres }}</td><td>{{ s.telefoon }}</td><td>{{ s.route_nummer or '–' }}</td>
+<td><form method="post" action="{{ url_for('stembureau_verwijder', sid=s.id) }}" onsubmit="return confirm('Verwijderen?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="rood">✕</button></form></td></tr>{% endfor %}</table>{% endblock %}

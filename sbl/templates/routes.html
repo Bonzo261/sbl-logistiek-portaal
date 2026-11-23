@@ -1,0 +1,2 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Routes</h1>
+<table>{% for r in rows %}<tr><td><a href="{{ url_for('route_pagina', route_id=r.id) }}">Route {{ r.nummer }}</a></td><td>{{ r.open }} openstaand</td></tr>{% endfor %}</table>{% endblock %}

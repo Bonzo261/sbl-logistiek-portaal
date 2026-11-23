@@ -1,0 +1,7 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Gebruikers</h1>
+<form method="post" action="{{ url_for('gebruiker_nieuw') }}" class="kaart rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input name="naam" placeholder="Naam" required><input type="password" name="wachtwoord" placeholder="Wachtwoord (min. 10)" minlength="10" required>
+<select name="rol">{% for r in rollen %}<option>{{ r }}</option>{% endfor %}</select>
+<select name="route_id"><option value="">Route (alleen chauffeur)</option>{% for r in routes %}<option value="{{ r.id }}">Route {{ r.nummer }}</option>{% endfor %}</select><button>Aanmaken</button></form>
+<table>{% for u in rows %}<tr><td>{{ u.naam }}</td><td>{{ u.rol }}</td><td>{% if u.route_nummer %}route {{ u.route_nummer }}{% endif %}</td>
+<td><form method="post" action="{{ url_for('gebruiker_verwijder', uid=u.id) }}" onsubmit="return confirm('Verwijderen?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="rood">✕</button></form></td></tr>{% endfor %}</table>{% endblock %}
