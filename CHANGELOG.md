@@ -7,6 +7,7 @@ Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Handleidingen in `docs/`: installatie, beheerder, coördinator en chauffeur
 - Logboek: filteren op type (gateway, berichten, inloggen en account, gebruikers, stembureaus en routes, instellingen, back-up)
 - Beheer: gateway-status (verbonden, storing of nog geen heartbeat) met tijdstip van laatste heartbeat en laatste sms
 - Routes-overzicht toont ook de stembureaunummers per stadium

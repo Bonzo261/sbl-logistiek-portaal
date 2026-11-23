@@ -6,6 +6,12 @@
 
 Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen server, ook in de cloud. De beheerder van de installatie is zelf verantwoordelijk voor beheer, updates en back-ups.
 
+## Handleidingen
+- [Installatie](docs/INSTALLATIE.md)
+- [Beheerder](docs/HANDLEIDING-BEHEERDER.md)
+- [Coördinator](docs/HANDLEIDING-COORDINATOR.md)
+- [Chauffeur](docs/HANDLEIDING-CHAUFFEUR.md)
+
 ## Functies
 **Werkproces**
 - Sms-ontvangst via webhook (`/api/sms`); stembureau, adres, voorzitter en route-advies worden automatisch opgezocht
