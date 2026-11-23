@@ -1,2 +1,6 @@
 {% extends "basis.html" %}{% block inhoud %}<h1>Routes</h1>
-<table>{% for r in rows %}<tr><td><a href="{{ url_for('route_pagina', route_id=r.id) }}">Route {{ r.nummer }}</a></td><td>{{ r.open }} openstaand</td></tr>{% endfor %}</table>{% endblock %}
+{% if nieuw %}<p class="klein"><b>{{ nieuw }}</b> nieuw bericht{{ 'en' if nieuw != 1 }} nog zonder route (zie <a href="{{ url_for('portaal') }}">portaal</a>).</p>{% endif %}
+<table><tr><th>Route</th>{% if accepteren %}<th>Wacht op acceptatie</th>{% endif %}<th>Onderweg</th><th>Klaar vandaag</th></tr>
+{% for r in rows %}<tr><td><a href="{{ url_for('route_pagina', route_id=r.id) }}">Route {{ r.nummer }}</a></td>
+{% if accepteren %}<td>{{ r.wacht or '–' }}</td>{% endif %}<td>{{ (r.onderweg + (0 if accepteren else r.wacht)) or '–' }}</td><td>{{ r.klaar or '–' }}</td></tr>{% endfor %}</table>
+<p class="klein">Openstaand = wacht op acceptatie + onderweg. Klaar telt alleen vandaag.</p>{% endblock %}

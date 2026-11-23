@@ -706,3 +706,11 @@ def test_eigen_webhooksleutel(client):
     assert client.post("/api/sms?sleutel=a b!", data={"message": "1"}).status_code == 403
     post(client, "/beheer/instellingen", {"csrf": t, "sleutel_modus": "veilig"})
     assert client.post("/api/sms?sleutel=test123", data={"message": "1"}).status_code == 403
+
+
+def test_routes_pagina_stadia(client):
+    maak_admin(client)
+    r = client.get("/routes")
+    assert r.status_code == 200
+    t = r.get_data(as_text=True)
+    assert "Onderweg" in t and "Klaar vandaag" in t
