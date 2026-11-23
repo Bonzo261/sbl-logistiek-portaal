@@ -40,3 +40,7 @@ Automatisch printen (kiosk), herstelcodes voor 2FA,  optionele Epson ePOS-printe
 
 ## Licentie
 GNU Affero General Public License v3.0 of later (AGPL-3.0-or-later). Je mag de software vrij gebruiken en aanpassen; wie aangepaste versies als dienst aanbiedt, moet de aangepaste broncode ook beschikbaar stellen. De volledige licentietekst staat in het bestand `LICENSE`.
+
+## Docker-image (Docker Hub)
+Bij elke wijziging op `main` bouwt GitHub automatisch een image en zet die op Docker Hub (`<gebruiker>/sbl-logistiek-portaal:latest`). Vereist de repository-secrets `DOCKERHUB_USERNAME` en `DOCKERHUB_TOKEN`.
+Draaien: `docker run -d -p 8000:8000 -v sbl-data:/data -e SBL_HTTPS=1 <gebruiker>/sbl-logistiek-portaal:latest`
