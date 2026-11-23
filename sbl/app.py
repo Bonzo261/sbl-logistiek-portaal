@@ -31,7 +31,8 @@ def migreer(c):
     c.executescript(open(os.path.join(HIER, "schema.sql")).read())
     kolommen = {k[1] for k in c.execute("PRAGMA table_info(gebruiker)")}
     for kol, typ in (("totp_geheim", "TEXT"), ("totp_laatst", "INTEGER NOT NULL DEFAULT 0"),
-                     ("herstel", "TEXT NOT NULL DEFAULT '[]'")):
+                     ("herstel", "TEXT NOT NULL DEFAULT '[]'"),
+                     ("moet_wijzigen", "INTEGER NOT NULL DEFAULT 0")):
         if kol not in kolommen:
             c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
     c.commit()
@@ -115,6 +116,9 @@ def create_app(config=None):
             g.gebruiker = db().execute("SELECT * FROM gebruiker WHERE id=?", (session["uid"],)).fetchone()
             if not g.gebruiker:
                 session.clear()
+            elif (g.gebruiker["moet_wijzigen"]
+                  and request.endpoint not in ("wachtwoord_verplicht", "wachtwoord_wijzigen", "logout", "static")):
+                return redirect(url_for("wachtwoord_verplicht"))
             elif (app.config["TWEEFA_VERPLICHT"] and g.gebruiker["rol"] != "chauffeur"
                   and not g.gebruiker["totp_geheim"]
                   and request.endpoint not in ("account", "tweefa_start", "tweefa_bevestig", "wachtwoord_wijzigen", "logout", "static")):
@@ -277,11 +281,21 @@ def create_app(config=None):
             flash("Huidig wachtwoord klopt niet.")
         elif len(f.get("nieuw", "")) < 10 or f.get("nieuw") != f.get("nieuw2"):
             flash("Nieuw wachtwoord: minimaal 10 tekens en beide velden gelijk.")
+        elif f["nieuw"] == f.get("huidig"):
+            flash("Kies een ander wachtwoord dan het huidige.")
         else:
-            db().execute("UPDATE gebruiker SET hash=? WHERE id=?", (generate_password_hash(f["nieuw"]), g.gebruiker["id"]))
+            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=0 WHERE id=?",
+                         (generate_password_hash(f["nieuw"]), g.gebruiker["id"]))
             audit("wachtwoord gewijzigd")
             flash("Wachtwoord gewijzigd.")
-        return redirect(url_for("account"))
+            return redirect(url_for("start"))
+        return redirect(url_for("wachtwoord_verplicht" if g.gebruiker["moet_wijzigen"] else "account"))
+
+    @app.get("/account/nieuw-wachtwoord")
+    def wachtwoord_verplicht():
+        if not g.gebruiker:
+            return redirect(url_for("login"))
+        return render_template("wachtwoord_verplicht.html")
 
     @app.post("/beheer/gebruikers/<int:uid>/wachtwoord")
     @rol_vereist("beheerder")
@@ -290,7 +304,7 @@ def create_app(config=None):
         if len(nieuw) < 10:
             flash("Wachtwoord moet minimaal 10 tekens zijn.")
         else:
-            db().execute("UPDATE gebruiker SET hash=? WHERE id=?", (generate_password_hash(nieuw), uid))
+            db().execute("UPDATE gebruiker SET hash=?, moet_wijzigen=1 WHERE id=?", (generate_password_hash(nieuw), uid))
             audit(f"wachtwoord gereset voor gebruiker-id {uid}")
             flash("Wachtwoord ingesteld.")
         return redirect(url_for("beheer_gebruikers"))
@@ -629,13 +643,38 @@ def create_app(config=None):
             flash("Vul naam, rol en een wachtwoord van minimaal 10 tekens in.")
             return redirect(url_for("beheer_gebruikers"))
         try:
-            db().execute("INSERT INTO gebruiker (naam,hash,rol,route_id) VALUES (?,?,?,?)",
+            db().execute("INSERT INTO gebruiker (naam,hash,rol,route_id,moet_wijzigen) VALUES (?,?,?,?,?)",
                          (f["naam"].strip(), generate_password_hash(f["wachtwoord"]), rol,
-                          f.get("route_id", type=int) if rol == "chauffeur" else None))
+                          f.get("route_id", type=int) if rol == "chauffeur" else None,
+                          1 if f.get("moet_wijzigen") else 0))
         except sqlite3.IntegrityError:
             flash("Deze naam bestaat al.")
         audit(f"gebruiker {f['naam']} aangemaakt")
         return redirect(url_for("beheer_gebruikers"))
+
+    @app.route("/beheer/gebruikers/bulk", methods=["GET", "POST"])
+    @rol_vereist("beheerder")
+    def gebruikers_bulk():
+        if request.method == "GET":
+            return render_template("bulk.html", routes=routes(), resultaat=None)
+        voorvoegsel = "".join(ch for ch in request.form.get("voorvoegsel", "route").strip() if ch.isalnum() or ch in "-_") or "route"
+        gekozen = set(request.form.getlist("route_id", type=int))
+        alfabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        gemaakt, overgeslagen = [], []
+        for r in routes():
+            if r["id"] not in gekozen:
+                continue
+            naam = f"{voorvoegsel}{r['nummer']}"
+            ww = "".join(secrets.choice(alfabet) for _ in range(12))
+            try:
+                db().execute("INSERT INTO gebruiker (naam,hash,rol,route_id,moet_wijzigen) VALUES (?,?,'chauffeur',?,1)",
+                             (naam, generate_password_hash(ww), r["id"]))
+                gemaakt.append((naam, r["nummer"], ww))
+            except sqlite3.IntegrityError:
+                overgeslagen.append(naam)
+        audit(f"bulk: {len(gemaakt)} chauffeursaccounts aangemaakt")
+        resp = render_template("bulk.html", routes=routes(), resultaat=gemaakt, overgeslagen=overgeslagen)
+        return resp, 200, {"Cache-Control": "no-store"}
 
     @app.post("/beheer/gebruikers/<int:uid>/verwijder")
     @rol_vereist("beheerder")

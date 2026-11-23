@@ -216,3 +216,32 @@ def test_herstelcode_werkt_een_keer(tmp_path):
     post(c, "/login", {"naam": "admin", "wachtwoord": "langwachtwoord1"})
     post(c, "/login/2fa", {"code": codes[0]}, "/login/2fa")  # hergebruik
     assert c.get("/portaal").status_code == 302
+
+
+def test_bulk_accounts_en_verplichte_wijziging(client):
+    c = client
+    maak_admin(c)
+    post(c, "/beheer/routes", {"aantal": "3"}, "/beheer")
+    r = post(c, "/beheer/gebruikers/bulk", {"voorvoegsel": "route", "route_id": ["1", "2", "3"]}, "/beheer/gebruikers/bulk")
+    html = r.get_data(as_text=True)
+    assert "3 accounts aangemaakt" in html
+    rijen = re.findall(r"<td>(route\d)</td><td><code>(\w{12})</code>", html)
+    assert [n for n, _ in rijen] == ["route1", "route2", "route3"]
+    assert len({w for _, w in rijen}) == 3  # uniek per account
+    # opnieuw: bestaande worden overgeslagen
+    r2 = post(c, "/beheer/gebruikers/bulk", {"voorvoegsel": "route", "route_id": ["1"]}, "/beheer/gebruikers/bulk")
+    assert "0 accounts aangemaakt" in r2.get_data(as_text=True)
+    post(c, "/logout", tokenurl="/beheer")
+    naam, tijdelijk = rijen[1]
+    post(c, "/login", {"naam": naam, "wachtwoord": tijdelijk})
+    # alles wordt omgeleid naar wachtwoord kiezen
+    assert c.get("/route/2").headers["Location"].endswith("/account/nieuw-wachtwoord")
+    assert c.get("/account/nieuw-wachtwoord").status_code == 200
+    # zelfde wachtwoord wordt geweigerd
+    post(c, "/account/wachtwoord", {"huidig": tijdelijk, "nieuw": tijdelijk, "nieuw2": tijdelijk}, "/account/nieuw-wachtwoord")
+    assert c.get("/route/2").status_code == 302
+    post(c, "/account/wachtwoord", {"huidig": tijdelijk, "nieuw": "eigenwachtwoord12", "nieuw2": "eigenwachtwoord12"}, "/account/nieuw-wachtwoord")
+    assert c.get("/route/2").status_code == 200
+    assert c.get("/route/1").status_code == 403
+    post(c, "/logout", tokenurl="/route/2")
+    assert post(c, "/login", {"naam": naam, "wachtwoord": tijdelijk}).get_data(as_text=True).count("Onjuiste") == 1
