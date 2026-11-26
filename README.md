@@ -115,7 +115,6 @@ De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.
 Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, Postgres.
 
 Wensen:
-- Rijvolgorde van de opdrachten op een route: de chauffeur kan zelf herordenen en/of de coördinator bepaalt de volgorde (nu staan opdrachten op volgorde van acceptatie).
 - Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).
 
 ## Licentie

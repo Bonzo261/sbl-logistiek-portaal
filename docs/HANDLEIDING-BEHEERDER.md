@@ -25,6 +25,7 @@ Stel het aantal routes in. Een route die nog stembureaus of openstaande berichte
 ## Werkwijze
 *Beheer → Werkwijze*:
 - **Acceptatie door chauffeur**: aan = de chauffeur moet een toegewezen stembureau eerst accepteren ("ik ga erheen"). Zolang dat niet is gebeurd kan de coördinator het naar een andere route verplaatsen; de oude route krijgt daarvan een melding. Een instelbare waarschuwing kleurt niet-geaccepteerde opdrachten oranje en later rood.
+- **Rijvolgorde**: aan = de chauffeur en de coördinator kunnen opdrachten onderweg met ▲ en ▼ eerder of later in de rij zetten. De volgorde is voor beiden zichtbaar ("Volgorde 1, 2, …"). Uit = opdrachten staan op volgorde van acceptatie.
 - **Geluid bij nieuw bericht** voor coördinatoren, en **melding voor chauffeurs** (pop-up, geluid, trillen). Beide kun je uitzetten.
 
 ## Sms-ontvangst en bewaking

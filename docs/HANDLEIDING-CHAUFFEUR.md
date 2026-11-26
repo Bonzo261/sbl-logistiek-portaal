@@ -25,6 +25,9 @@ Bij elke opdracht zie je het stembureau, het adres en de voorzitter. Er zijn dri
 4. Bel de voorzitter als dat nodig is en navigeer erheen.
 5. Tik op **Klaar** als je het klusje hebt afgerond. De opdracht verdwijnt van je lijst.
 
+### Volgorde van je opdrachten
+Heb je meer dan één opdracht onderweg, dan staat bij elke opdracht "Volgorde 1", "Volgorde 2", enzovoort. Staat de rijvolgorde aan, dan zie je rechts bij elke opdracht twee pijltjes. Met **▲** zet je de opdracht eerder, met **▼** later. De coördinator kan de volgorde ook aanpassen; je ziet het dan vanzelf veranderen.
+
 ## 4. Als de coördinator iets verplaatst
 Is een opdracht die je nog niet had geaccepteerd naar een andere route verplaatst? Dan zie je een melding dat dit stembureau aan een andere route is toegewezen. Je hoeft er niets mee te doen.
 

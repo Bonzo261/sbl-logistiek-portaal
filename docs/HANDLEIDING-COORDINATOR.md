@@ -35,6 +35,9 @@ Elk bericht toont het stembureau met adres, voorzitter, telefoonnummer en de ont
 ## Routes
 De pagina **Routes** toont per route wat er speelt: wacht op acceptatie, onderweg en klaar vandaag, met de stembureaunummers tussen haakjes. Klik op een route om te zien wat de chauffeur ziet.
 
+## Rijvolgorde
+Staat de rijvolgorde aan (Beheer → Werkwijze), dan kun je op de routepagina de opdrachten onderweg met ▲ en ▼ eerder of later zetten. De chauffeur ziet de nieuwe volgorde meteen en kan zelf ook wisselen. Opdrachten die net zijn geaccepteerd komen onderaan.
+
 ## Overzichtsscherm
 `/scherm` is bedoeld voor een grote monitor. Je ziet per route het aantal open opdrachten (kleur naar wachttijd), de wachtende berichten, hoeveel er vandaag klaar zijn en een storingsbalk. Een kleine knop rechtsonder zet het scherm op volledig scherm.
 

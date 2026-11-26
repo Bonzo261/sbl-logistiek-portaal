@@ -826,3 +826,46 @@ def test_api_v1_leverancier(client):
     assert client.post("/api/sms?sleutel=" + key, data={"message": "1"}).status_code == 403
     client.post("/beheer/api-sleutel", data={"csrf": t, "actie": "uit"})
     assert client.post("/api/v1/berichten", json={"stembureau": 42}, headers=h).status_code == 403
+
+
+def test_rijvolgorde(client):
+    import sqlite3
+    maak_admin(client)
+    t = token(client)
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    con.execute("INSERT INTO route (nummer) VALUES (1)") if con.execute("SELECT COUNT(*) FROM route").fetchone()[0] == 0 else None
+    rid = con.execute("SELECT id FROM route ORDER BY nummer LIMIT 1").fetchone()[0]
+    ids = []
+    for n in (11, 12, 13):
+        con.execute("INSERT INTO stembureau (nummer, naam) VALUES (?, ?)", (n, f"SB{n}"))
+        sid = con.execute("SELECT id FROM stembureau WHERE nummer=?", (n,)).fetchone()[0]
+        cur = con.execute("INSERT INTO bericht (stembureau_id, tekst, status, route_id, ontvangen, onderweg_op, geaccepteerd_op) "
+                          "VALUES (?, ?, 'onderweg', ?, '2026-01-01 10:00:00', '2026-01-01 10:00:00', ?)",
+                          (sid, str(n), rid, f"2026-01-01 10:0{len(ids)}:00"))
+        ids.append(cur.lastrowid)
+    con.commit()
+
+    def volgorde():
+        h = client.get(f"/route/{rid}").get_data(as_text=True)
+        return [h.index(f"SB{n}") for n in (11, 12, 13)]
+
+    assert "Eerder" not in client.get(f"/route/{rid}").get_data(as_text=True)  # uit: geen knoppen
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "op"})
+    assert volgorde() == sorted(volgorde())  # uit: niets veranderd
+    client.post("/beheer/werkwijze", data={"csrf": t, "rijvolgorde": "1", "geluid_nieuw": "1", "melding_chauffeur": "1"})
+    assert "Eerder" in client.get(f"/route/{rid}").get_data(as_text=True)
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "op"})  # 13 voor 12
+    v = volgorde()
+    assert v[0] < v[2] < v[1]
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "op"})  # 13 voor 11
+    v = volgorde()
+    assert v[2] < v[0] < v[1]
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "op"})  # al bovenaan
+    assert volgorde()[2] < volgorde()[0]
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "neer"})
+    v = volgorde()
+    assert v[0] < v[2] < v[1]
+    # signatuur van de pollingstatus verandert bij een nieuwe volgorde
+    h1 = client.get(f"/route/{rid}/status.json").get_json()["handtekening"]
+    client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "neer"})
+    assert client.get(f"/route/{rid}/status.json").get_json()["handtekening"] != h1

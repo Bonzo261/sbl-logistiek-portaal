@@ -64,6 +64,8 @@ def migreer(c):
             c.execute(f"ALTER TABLE gebruiker ADD COLUMN {kol} {typ}")
     if "geaccepteerd_op" not in {k[1] for k in c.execute("PRAGMA table_info(bericht)")}:
         c.execute("ALTER TABLE bericht ADD COLUMN geaccepteerd_op TEXT")
+    if "volgorde" not in {k[1] for k in c.execute("PRAGMA table_info(bericht)")}:
+        c.execute("ALTER TABLE bericht ADD COLUMN volgorde INTEGER")
     c.commit()
 
 
@@ -667,27 +669,59 @@ def create_app(config=None):
         route = db().execute("SELECT * FROM route WHERE id=?", (route_id,)).fetchone()
         if not route:
             abort(404)
-        items = db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
-                                FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
-                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY COALESCE(b.geaccepteerd_op, b.onderweg_op), b.id""", (route_id,)).fetchall()
+        items = route_items(route_id)
         laatste_melding = db().execute("SELECT COALESCE(MAX(id),0) m FROM route_melding WHERE route_id=?", (route_id,)).fetchone()["m"]
         return render_template("route.html", route=route, items=items, laatste_melding=laatste_melding,
+                               rijvolgorde=rijvolgorde_aan(),
                                melding=instelling("melding_chauffeur", "1") == "1")
+
+    def rijvolgorde_aan():
+        return instelling("rijvolgorde", "0") == "1"
+
+    def route_items(route_id):
+        """Openstaande opdrachten van een route. Onderweg staat op rijvolgorde (als die aan staat en is ingesteld),
+        daarna op volgorde van acceptatie."""
+        return db().execute("""SELECT b.*, s.nummer AS sb_nummer, s.naam AS sb_naam, s.adres, s.telefoon
+                               FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id
+                               WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg')
+                               ORDER BY """ + ("b.volgorde IS NULL, b.volgorde, " if rijvolgorde_aan() else "") +
+                            "COALESCE(b.geaccepteerd_op, b.onderweg_op), b.id", (route_id,)).fetchall()
+
+    @app.post("/bericht/<int:bid>/verplaats")
+    @rol_vereist("beheerder", "coordinator", "chauffeur")
+    def bericht_verplaats(bid):
+        """Zet een opdracht onderweg een plek eerder of later in de rijvolgorde (chauffeur van de route of coordinator)."""
+        b = db().execute("SELECT * FROM bericht WHERE id=?", (bid,)).fetchone()
+        if not b:
+            abort(404)
+        if g.gebruiker["rol"] == "chauffeur" and b["route_id"] != g.gebruiker["route_id"]:
+            abort(403)
+        terug = request.form.get("terug", "")
+        doel = terug if terug.startswith("/") and not terug.startswith("//") else url_for("start")
+        if not rijvolgorde_aan() or b["status"] != "onderweg" or request.form.get("richting") not in ("op", "neer"):
+            return redirect(doel)
+        ids = [r["id"] for r in route_items(b["route_id"]) if r["status"] == "onderweg"]
+        i = ids.index(bid)
+        j = i - 1 if request.form["richting"] == "op" else i + 1
+        if 0 <= j < len(ids):
+            ids[i], ids[j] = ids[j], ids[i]
+        for n, x in enumerate(ids, 1):  # hele lijst opnieuw nummeren zodat de volgorde vastligt
+            db().execute("UPDATE bericht SET volgorde=? WHERE id=?", (n, x))
+        audit(f"bericht {bid} verplaatst in rijvolgorde")
+        return redirect(doel)
 
     @app.get("/route/<int:route_id>/status.json")
     @rol_vereist("beheerder", "coordinator", "chauffeur")
     def route_status(route_id):
         if g.gebruiker["rol"] == "chauffeur" and g.gebruiker["route_id"] != route_id:
             abort(403)
-        rijen = db().execute("""SELECT b.id, b.status, s.nummer, s.naam FROM bericht b
-                                LEFT JOIN stembureau s ON s.id=b.stembureau_id
-                                WHERE b.route_id=? AND b.status IN ('toegewezen','onderweg') ORDER BY b.id""", (route_id,)).fetchall()
+        rijen = route_items(route_id)
         handtekening = hashlib.sha1(";".join(f"{r['id']}:{r['status']}" for r in rijen).encode()).hexdigest()
         na = request.args.get("na", 0, type=int)
         meldingen = db().execute("SELECT id, tekst FROM route_melding WHERE route_id=? AND id>? ORDER BY id", (route_id, na)).fetchall()
         resp = jsonify(handtekening=handtekening, melding=instelling("melding_chauffeur", "1") == "1",
                        meldingen=[{"id": m["id"], "tekst": m["tekst"]} for m in meldingen],
-                       items=[{"id": r["id"], "nr": r["nummer"], "naam": r["naam"] or "", "status": r["status"]} for r in rijen])
+                       items=[{"id": r["id"], "nr": r["sb_nummer"], "naam": r["sb_naam"] or "", "status": r["status"]} for r in rijen])
         resp.headers["Cache-Control"] = "no-store"
         return resp
 
@@ -727,7 +761,7 @@ def create_app(config=None):
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
-                               accepteren=instelling("accepteren_verplicht", "0") == "1", geluid=instelling("geluid_nieuw", "1") == "1",
+                               rijvolgorde=rijvolgorde_aan(), accepteren=instelling("accepteren_verplicht", "0") == "1", geluid=instelling("geluid_nieuw", "1") == "1",
                                melding_chauffeur=instelling("melding_chauffeur", "1") == "1", accepteer_drempel=instelling("accepteer_drempel", "5"),
                                scherm_sleutel=instelling("scherm_sleutel"), scherm_drempel=instelling("scherm_drempel", "15"))
 
@@ -1333,13 +1367,14 @@ def create_app(config=None):
         aan = "1" if request.form.get("accepteren_verplicht") else "0"
         zet_instelling("accepteren_verplicht", aan)
         zet_instelling("geluid_nieuw", "1" if request.form.get("geluid_nieuw") else "0")
+        zet_instelling("rijvolgorde", "1" if request.form.get("rijvolgorde") else "0")
         zet_instelling("melding_chauffeur", "1" if request.form.get("melding_chauffeur") else "0")
         d = request.form.get("accepteer_drempel", type=int)
         if d and 1 <= d <= 120:
             zet_instelling("accepteer_drempel", d)
         if aan == "0":  # openstaande opdrachten die nog op acceptatie wachten gaan gewoon door
             db().execute("UPDATE bericht SET status='onderweg' WHERE status='toegewezen'")
-        audit(f"acceptatie door chauffeur {'aan' if aan == '1' else 'uit'}")
+        audit(f"acceptatie door chauffeur {'aan' if aan == '1' else 'uit'}, rijvolgorde {'aan' if request.form.get('rijvolgorde') else 'uit'}")
         flash("Werkwijze opgeslagen.")
         return redirect(url_for("beheer"))
 
