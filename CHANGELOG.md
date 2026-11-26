@@ -8,6 +8,7 @@ Eerste versie, losgemaakt van Home Assistant.
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Database: WAL-modus en langere wachttijd bij gelijktijdige toegang, zodat veel verversende schermen schrijfacties niet vertragen
 - Rapportage (managementrapport): doorlooptijden (gemiddeld, mediaan, langste), welke stembureaus als eerste en laatste klaar waren, per route en per uur, download als Excel; per verkiezing vast te leggen als cijfers zonder persoonsgegevens, ook vanuit Opruimen
 - De knop "Print" is uit het portaal gehaald; de afdrukpagina zelf blijft in de code voor later printen
 - Rijvolgorde (aan/uit onder Beheer → Werkwijze): chauffeur en coördinator zetten opdrachten onderweg met ▲ en ▼ eerder of later; de nieuwe volgorde verschijnt vanzelf bij de ander

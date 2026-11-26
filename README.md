@@ -112,7 +112,7 @@ python -m pytest
 De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom, zie [`CONTRIBUTING.md`](CONTRIBUTING.md); beveiligingsproblemen meld je volgens [`SECURITY.md`](SECURITY.md).
 
 ## Roadmap
-Automatisch printen (kiosk), optionele Epson ePOS-printer, Postgres, rapportages van meerdere verkiezingen naast elkaar leggen.
+Automatisch printen (kiosk), optionele Epson ePOS-printer, Postgres (alleen nodig bij heel veel gelijktijdig gebruik of een eis van de organisatie), rapportages van meerdere verkiezingen naast elkaar leggen.
 
 Wensen:
 - Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).

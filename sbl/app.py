@@ -103,9 +103,11 @@ def create_app(config=None):
     # ---------- database ----------
     def db():
         if "db" not in g:
-            g.db = sqlite3.connect(app.config["DATABASE"])
+            g.db = sqlite3.connect(app.config["DATABASE"], timeout=15)
             g.db.row_factory = sqlite3.Row
             g.db.execute("PRAGMA foreign_keys=ON")
+            g.db.execute("PRAGMA journal_mode=WAL")  # lezers (schermen die verversen) blokkeren schrijvers niet
+            g.db.execute("PRAGMA synchronous=NORMAL")
         return g.db
 
     @app.teardown_appcontext
@@ -1083,6 +1085,7 @@ def create_app(config=None):
         doel = sqlite3.connect(tmp)
         try:
             bron.backup(doel)
+            doel.execute("PRAGMA journal_mode=DELETE")  # een back-up is één los bestand, zonder -wal/-shm
         finally:
             doel.close()
             bron.close()
