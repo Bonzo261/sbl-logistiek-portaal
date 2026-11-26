@@ -28,7 +28,6 @@ Elk bericht toont het stembureau met adres, voorzitter, telefoonnummer en de ont
 - Opdrachten die te lang niet zijn geaccepteerd worden oranje en daarna rood. Bel de chauffeur of verplaats de opdracht.
 
 ### Overig
-- **Bon afdrukken**: per bericht, voor 80 mm-papier, via de printfunctie van je browser.
 - **Verwijderen**: bijvoorbeeld bij een foutieve of dubbele sms. Een verwijderd bericht kun je niet terughalen.
 - Berichten van een nummer dat niet in de lijst staat komen als niet herkend binnen. Zoek het stembureau op of vraag de beheerder het toe te voegen.
 

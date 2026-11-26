@@ -30,7 +30,6 @@
 {% for b in onderweg %}<div class="kaart rij">
  <div><strong>Stembureau {{ b.sb_nummer }} – {{ b.sb_naam }}</strong> → route {{ b.route_nummer }}<br><span class="klein">{{ b.adres }}</span></div>
  <span class="sp"></span>
- <a class="knop grijs" href="{{ url_for('bericht_print', bid=b.id) }}" target="_blank">Print</a>
  <form method="post" action="{{ url_for('bericht_klaar', bid=b.id) }}"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><input type="hidden" name="terug" value="{{ url_for('portaal') }}"><button class="groen">Klaar</button></form>
 </div>{% else %}<p class="klein">Niets onderweg.</p>{% endfor %}
 <h2>Klaar (laatste 20)</h2>

@@ -8,6 +8,7 @@ Eerste versie, losgemaakt van Home Assistant.
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- De knop "Print" is uit het portaal gehaald; de afdrukpagina zelf blijft in de code voor later printen
 - Rijvolgorde (aan/uit onder Beheer → Werkwijze): chauffeur en coördinator zetten opdrachten onderweg met ▲ en ▼ eerder of later; de nieuwe volgorde verschijnt vanzelf bij de ander
 - API voor een softwareleverancier: `POST /api/v1/berichten` met een eigen sleutel (Bearer of `X-API-Key`), los van de sms-gateway; aan te zetten, te vernieuwen en in te trekken in Beheer
 - Beheer → Opruimen: na de verkiezing berichten, chauffeursaccounts, stembureaus, logboek en automatische back-ups wissen (met bevestiging en een back-up vooraf)
