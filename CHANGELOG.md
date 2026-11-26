@@ -1,8 +1,8 @@
 # Changelog
 
-Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); versies worden als git-tag (`v0.1.0`) en als Docker-image met dezelfde tag gepubliceerd.
+Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); versies worden als git-tag (`v1.0.0`) en als Docker-image met dezelfde tag gepubliceerd.
 
-## [0.1.0] – 2026-11-23
+## [1.0.0] – 2026-11-26
 Eerste versie, losgemaakt van Home Assistant.
 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
