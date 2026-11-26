@@ -37,6 +37,9 @@ De pagina **Routes** toont per route wat er speelt: wacht op acceptatie, onderwe
 ## Rijvolgorde
 Staat de rijvolgorde aan (Beheer → Werkwijze), dan kun je op de routepagina de opdrachten onderweg met ▲ en ▼ eerder of later zetten. De chauffeur ziet de nieuwe volgorde meteen en kan zelf ook wisselen. Opdrachten die net zijn geaccepteerd komen onderaan.
 
+## Rapportage
+Onder **Rapportage** zie je het huidige rapport en de vastgelegde verkiezingen: aantallen, doorlooptijden, welke stembureaus als eerste en als laatste klaar waren, per route en per uur. Je kunt het als Excel downloaden. Vastleggen en verwijderen doet de beheerder.
+
 ## Overzichtsscherm
 `/scherm` is bedoeld voor een grote monitor. Je ziet per route het aantal open opdrachten (kleur naar wachttijd), de wachtende berichten, hoeveel er vandaag klaar zijn en een storingsbalk. Een kleine knop rechtsonder zet het scherm op volledig scherm.
 

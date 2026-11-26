@@ -32,3 +32,12 @@ CREATE TABLE IF NOT EXISTS route_melding (
   id INTEGER PRIMARY KEY, route_id INTEGER NOT NULL REFERENCES route(id) ON DELETE CASCADE,
   tekst TEXT NOT NULL, tijd REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS verkiezing (
+  id INTEGER PRIMARY KEY, naam TEXT NOT NULL, datum TEXT NOT NULL, vastgelegd_op TEXT NOT NULL,
+  storingen INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS verkiezing_regel (
+  id INTEGER PRIMARY KEY, verkiezing_id INTEGER NOT NULL REFERENCES verkiezing(id) ON DELETE CASCADE,
+  nummer INTEGER, naam TEXT NOT NULL DEFAULT '', route_nummer INTEGER,
+  ontvangen TEXT, toegewezen TEXT, geaccepteerd TEXT, klaar TEXT
+);

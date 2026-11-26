@@ -869,3 +869,43 @@ def test_rijvolgorde(client):
     h1 = client.get(f"/route/{rid}/status.json").get_json()["handtekening"]
     client.post(f"/bericht/{ids[2]}/verplaats", data={"csrf": t, "richting": "neer"})
     assert client.get(f"/route/{rid}/status.json").get_json()["handtekening"] != h1
+
+
+def test_rapportage(client):
+    import sqlite3
+    from sbl.rapport import maak_rapport, duur
+    r = maak_rapport([
+        {"nummer": 1, "naam": "A", "route_nummer": 1, "ontvangen": "2026-03-18 20:00:00", "toegewezen": "2026-03-18 20:02:00", "geaccepteerd": None, "klaar": "2026-03-18 20:32:00"},
+        {"nummer": 2, "naam": "B", "route_nummer": 1, "ontvangen": "2026-03-18 20:05:00", "toegewezen": "2026-03-18 20:06:00", "geaccepteerd": None, "klaar": "2026-03-18 20:16:00"},
+        {"nummer": 3, "naam": "C", "route_nummer": None, "ontvangen": "2026-03-18 21:00:00", "toegewezen": None, "geaccepteerd": None, "klaar": None},
+        {"nummer": None, "naam": "", "route_nummer": None, "ontvangen": "2026-03-18 21:30:00", "toegewezen": None, "geaccepteerd": None, "klaar": None}])
+    assert r["berichten"] == 4 and r["onbekend"] == 1 and r["klaar"] == 2 and r["open"] == 2
+    assert r["rit"]["gem"] == 1200 and duur(r["rit"]["gem"]) == "20 min"
+    assert [s["nummer"] for s in r["eerst_klaar"]] == [2, 1] and [s["nummer"] for s in r["laatst_klaar"]] == [1, 2]
+    assert [s["nummer"] for s in r["nog_open"]] == [3]
+    assert duur(3900) == "1 u 05 min" and duur(None) == "–"
+
+    maak_admin(client)
+    t = token(client)
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    con.execute("INSERT INTO stembureau (nummer, naam) VALUES (31, 'Rapport-test')")
+    sid = con.execute("SELECT id FROM stembureau WHERE nummer=31").fetchone()[0]
+    con.execute("INSERT INTO bericht (stembureau_id, tekst, status, ontvangen, onderweg_op, klaar_op) VALUES (?, 'GEHEIM 06-12345678', 'klaar', "
+                "'2026-03-18 20:00:00', '2026-03-18 20:01:00', '2026-03-18 20:21:00')", (sid,))
+    con.commit(); con.close()
+    assert "Rapport-test" in client.get("/rapportage/huidig").get_data(as_text=True)
+    assert client.get("/rapportage/huidig/excel").status_code == 200
+    r = client.post("/rapportage/vastleggen", data={"csrf": t, "naam": "Test 2026", "datum": "2026-03-18"}, follow_redirects=True)
+    assert "Test 2026" in r.get_data(as_text=True) and "20 min" in r.get_data(as_text=True)
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    assert "GEHEIM" not in str(con.execute("SELECT * FROM verkiezing_regel").fetchall())
+    con.close()
+    # opruimen met vastleggen: berichten weg, rapport blijft
+    client.post("/beheer/opruimen", data={"csrf": t, "berichten": "1", "vastleg_naam": "Tweede", "bevestig": "OPRUIMEN"})
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    assert con.execute("SELECT COUNT(*) FROM bericht").fetchone()[0] == 0
+    assert con.execute("SELECT COUNT(*) FROM verkiezing").fetchone()[0] == 2
+    con.close()
+    assert client.get("/rapportage/999").status_code == 404
+    client.post("/rapportage/1/verwijder", data={"csrf": t})
+    assert "Test 2026" not in client.get("/rapportage").get_data(as_text=True)

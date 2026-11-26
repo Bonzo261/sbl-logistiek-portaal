@@ -5,6 +5,7 @@
 <p><label><input type="checkbox" name="berichten" value="1"> Alle berichten (sms'jes en meldingen aan routes) – {{ n.berichten }}</label></p>
 <p><label><input type="checkbox" name="chauffeurs" value="1"> Alle chauffeursaccounts – {{ n.chauffeurs }}</label></p>
 <p><label><input type="checkbox" name="stembureaus" value="1"> Alle stembureaus (adressen en telefoonnummers; later opnieuw te importeren) – {{ n.stembureaus }}</label></p>
+<p class="klein" style="margin-left:24px">Eerst vastleggen als rapportage (alleen cijfers per stembureau, geen sms-teksten): <input name="vastleg_naam" placeholder="Naam van de verkiezing; leeg = niet vastleggen" maxlength="80" size="38"></p>
 <p><label><input type="checkbox" name="logboek" value="1"> Het logboek – {{ n.logboek }} regels</label></p>
 <p><label><input type="checkbox" name="backups" value="1"> Alle automatische back-ups op de server – {{ n.backups }}</label></p>
 <p class="klein">Zonder de keuze voor back-ups maakt de app vóór het wissen eerst een back-up. Die bevat dan nog de gegevens; verwijder hem later bij <em>Back-up</em> of met de keuze hierboven. Gedownloade back-ups buiten de server moet je zelf opruimen. Coördinator- en beheerdersaccounts blijven bestaan.</p>

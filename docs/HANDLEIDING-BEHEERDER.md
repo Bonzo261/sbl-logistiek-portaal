@@ -49,8 +49,18 @@ Voor een softwareleverancier die zelf berichten wil aanleveren: *Beheer → Kopp
 - **Download** af en toe een back-up en bewaar die op een andere plek. Een back-up bevat wachtwoord-hashes en 2FA-sleutels, dus bewaar hem veilig.
 - **Herstellen** vervangt alle gegevens door die uit het bestand. Doe dat alleen bewust.
 
+## Rapportage
+Onder **Rapportage** (ook zichtbaar voor coördinatoren) staat een managementrapport:
+- cijfers in het kort: berichten, afgerond, nog open, looptijd, gateway-storingen;
+- doorlooptijden: gemiddeld, mediaan, langste en kortste, van toegewezen tot klaar, van ontvangen tot klaar en van ontvangen tot toegewezen;
+- welke stembureaus als eerste en als laatste klaar waren, en welke het langst of het kortst bij een route lagen;
+- per route en drukte per uur;
+- een lijst van alle stembureaus, en een download als Excel.
+
+*Rapport bekijken* toont de huidige gegevens. Met **Verkiezing vastleggen** (alleen beheerders) bewaar je een kopie met alleen cijfers: stembureaunummer en -naam, route en tijdstippen. Sms-teksten, adressen en telefoonnummers worden niet bewaard. Een vastgelegd rapport blijft staan als je daarna opruimt. Bij *Opruimen* kun je de berichten ook meteen laten vastleggen onder een naam. Bij een stembureau dat meerdere keren meldt, tellen de tijden van de eerste melding.
+
 ## Opruimen na de verkiezing
-*Beheer → Opruimen*: wis berichten, chauffeursaccounts, stembureaus (adressen en telefoonnummers), het logboek en de automatische back-ups. Je kiest zelf wat en typt ter bevestiging OPRUIMEN. Wissen kan niet ongedaan worden gemaakt. Als je de back-ups niet mee wist, maakt de app eerst een back-up; die bevat dan nog de gegevens en moet je later zelf verwijderen. Gedownloade back-ups buiten de server ruim je zelf op. Beheerders- en coördinatoraccounts blijven bestaan.
+*Beheer → Opruimen*: leg eventueel eerst de rapportage vast, en wis daarna berichten, chauffeursaccounts, stembureaus (adressen en telefoonnummers), het logboek en de automatische back-ups. Je kiest zelf wat en typt ter bevestiging OPRUIMEN. Wissen kan niet ongedaan worden gemaakt. Als je de back-ups niet mee wist, maakt de app eerst een back-up; die bevat dan nog de gegevens en moet je later zelf verwijderen. Gedownloade back-ups buiten de server ruim je zelf op. Beheerders- en coördinatoraccounts blijven bestaan.
 
 ## Logboek
 *Beheer → Logboek* toont de laatste 200 acties (inloggen, wachtwoorden, toewijzingen, gateway-storingen en herstel, instellingen). Filter op type met de keuzelijst bovenaan. Handig om storingen en wijzigingen na te gaan.

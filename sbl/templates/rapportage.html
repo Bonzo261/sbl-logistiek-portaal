@@ -1,0 +1,33 @@
+{% extends "basis.html" %}{% block inhoud %}<p><a class="knop grijs" href="{{ url_for('rapportage') }}">← Terug naar rapportage</a></p>
+<h1>{{ titel }}</h1>
+<p><a class="knop" href="{{ url_for('rapportage_excel', vid=vid) }}">Download Excel</a></p>
+{% macro tijd(s) %}{{ (s or '')[11:16] }}{% endmacro %}
+{% macro stat(naam, st) %}<tr><td>{{ naam }}</td><td><b>{{ duur(st.gem) }}</b></td><td>{{ duur(st.mediaan) }}</td><td>{{ duur(st.max) }}</td><td>{{ duur(st.min) }}</td><td>{{ st.n }}</td></tr>{% endmacro %}
+<div class="kaart"><h2>In het kort</h2>
+<table>
+<tr><td>Berichten ontvangen</td><td><b>{{ r.berichten }}</b> ({{ r.herkend }} herkend, {{ r.onbekend }} niet herkend)</td></tr>
+<tr><td>Afgerond</td><td><b>{{ r.klaar }}</b>{% if r.open %} · nog open: {{ r.open }}{% endif %}</td></tr>
+<tr><td>Stembureaus met melding</td><td><b>{{ r.stembureaus }}</b> ({{ r.stembureaus_klaar }} klaar){% if r.stembureaus_dubbel %} · meer dan één melding: {{ r.stembureaus_dubbel }}{% endif %}</td></tr>
+<tr><td>Eerste bericht</td><td>{{ r.eerste_ontvangen or '–' }}</td></tr>
+<tr><td>Laatste afgerond</td><td>{{ r.laatste_klaar or '–' }}</td></tr>
+<tr><td>Totale looptijd</td><td>{{ duur(r.looptijd) }}</td></tr>
+<tr><td>Gateway-storingen</td><td>{{ r.storingen }}</td></tr></table></div>
+<div class="kaart"><h2>Doorlooptijden</h2>
+<table><tr><th></th><th>Gemiddeld</th><th>Mediaan</th><th>Langste</th><th>Kortste</th><th>Aantal</th></tr>
+{{ stat('Toegewezen tot klaar', r.rit) }}{{ stat('Ontvangen tot klaar', r.totaal) }}{{ stat('Ontvangen tot toegewezen', r.wacht) }}{% if r.accept.n %}{{ stat('Toegewezen tot geaccepteerd', r.accept) }}{% endif %}</table>
+<p class="klein">Toegewezen tot klaar is de tijd dat een opdracht bij een route lag. Ontvangen tot toegewezen is de wachttijd bij de coördinator.</p></div>
+{% macro sblijst(titel, rijen, kolom) %}<div class="kaart"><h2>{{ titel }}</h2>{% if rijen %}<table><tr><th>Stembureau</th><th>Route</th><th>Klaar</th><th>Toegewezen tot klaar</th></tr>
+{% for s in rijen %}<tr><td>{{ s.nummer }} – {{ s.naam }}</td><td>{{ s.route or '–' }}</td><td>{{ tijd(s.klaar) or '–' }}</td><td>{{ duur(s.rit) }}</td></tr>{% endfor %}</table>{% else %}<p class="klein">Geen gegevens.</p>{% endif %}</div>{% endmacro %}
+{{ sblijst('Als eerste klaar', r.eerst_klaar) }}{{ sblijst('Als laatste klaar', r.laatst_klaar) }}{{ sblijst('Langste tijd bij een route', r.langzaamst) }}{{ sblijst('Kortste tijd bij een route', r.snelst) }}
+{% if r.nog_open %}<div class="kaart"><h2>Nog niet afgerond</h2><p>{% for s in r.nog_open %}{{ s.nummer }}{{ ', ' if not loop.last }}{% endfor %}</p></div>{% endif %}
+<div class="kaart"><h2>Per route</h2>{% if r.per_route %}<table><tr><th>Route</th><th>Berichten</th><th>Klaar</th><th>Gem. toegewezen tot klaar</th><th>Langste</th></tr>
+{% for x in r.per_route %}<tr><td>Route {{ x.route }}</td><td>{{ x.berichten }}</td><td>{{ x.klaar }}</td><td>{{ duur(x.rit.gem) }}</td><td>{{ duur(x.rit.max) }}</td></tr>{% endfor %}</table>{% else %}<p class="klein">Geen gegevens.</p>{% endif %}</div>
+{% set top = (r.per_uur|map(attribute='ontvangen')|list + r.per_uur|map(attribute='klaar')|list + [1])|max %}
+<div class="kaart"><h2>Drukte per uur</h2>{% if r.per_uur %}<table><tr><th>Uur</th><th>Ontvangen</th><th>Klaar</th></tr>
+{% for u in r.per_uur %}<tr><td>{{ '%02d' % u.uur }}:00</td>
+<td><span style="display:inline-block;height:12px;width:{{ (u.ontvangen / top * 160)|round|int }}px;background:var(--marine);vertical-align:middle"></span> {{ u.ontvangen }}</td>
+<td><span style="display:inline-block;height:12px;width:{{ (u.klaar / top * 160)|round|int }}px;background:var(--oranje);vertical-align:middle"></span> {{ u.klaar }}</td></tr>{% endfor %}</table>{% else %}<p class="klein">Geen gegevens.</p>{% endif %}</div>
+<details class="kaart"><summary><b>Alle stembureaus ({{ r.alle_stembureaus|length }})</b></summary>
+<table><tr><th>Nr</th><th>Naam</th><th>Route</th><th>Meldingen</th><th>Ontvangen</th><th>Klaar</th><th>Toegewezen tot klaar</th></tr>
+{% for s in r.alle_stembureaus %}<tr><td>{{ s.nummer }}</td><td>{{ s.naam }}</td><td>{{ s.route or '–' }}</td><td>{{ s.meldingen }}</td><td>{{ tijd(s.ontvangen) }}</td><td>{{ tijd(s.klaar) or '–' }}</td><td>{{ duur(s.rit) }}</td></tr>{% endfor %}</table></details>
+<p class="klein">Bij een stembureau dat meerdere keren meldt, tellen de tijden van de eerste melding.</p>{% endblock %}

@@ -18,7 +18,7 @@ from flask import (Flask, abort, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import importer, mail, totp
+from . import importer, mail, rapport, totp
 
 HIER = os.path.dirname(__file__)
 ROLLEN = ("beheerder", "coordinator", "chauffeur")
@@ -30,11 +30,12 @@ def nu(app=None):
 
 
 
-AUDIT_TYPES = ["Gateway", "Berichten", "Inloggen en account", "Gebruikers", "Stembureaus en routes", "Instellingen", "Back-up", "Opruimen", "Overig"]
+AUDIT_TYPES = ["Gateway", "Berichten", "Inloggen en account", "Gebruikers", "Stembureaus en routes", "Instellingen", "Back-up", "Rapportage", "Opruimen", "Overig"]
 _AUDIT_REGELS = [
     ("Gateway", ("gateway",)),
     ("Berichten", ("bericht ",)),
     ("Back-up", ("back-up",)),
+    ("Rapportage", ("rapportage",)),
     ("Opruimen", ("opgeruimd",)),
     ("Gebruikers", ("gebruiker", "bulk:", "selectie:", "wachtwoordenlijst", "wachtwoord gereset", "2fa gereset", "e-mailadres")),
     ("Inloggen en account", ("inloggen", "uitgelogd", "wachtwoord", "2fa", "herstelcode")),
@@ -1154,6 +1155,144 @@ def create_app(config=None):
             flash("Back-upinstellingen opgeslagen.")
         return redirect(url_for("beheer_backup_pagina"))
 
+    # ---------- managementrapportage ----------
+    def huidige_regels():
+        return [dict(r) for r in db().execute("""SELECT s.nummer AS nummer, COALESCE(s.naam,'') AS naam, r.nummer AS route_nummer,
+                       b.ontvangen, b.onderweg_op AS toegewezen, b.geaccepteerd_op AS geaccepteerd, b.klaar_op AS klaar
+                       FROM bericht b LEFT JOIN stembureau s ON s.id=b.stembureau_id LEFT JOIN route r ON r.id=b.route_id
+                       ORDER BY b.ontvangen, b.id""")]
+
+    def storingen_sinds(tijd):
+        if not tijd:
+            return 0
+        return db().execute("SELECT COUNT(*) c FROM audit WHERE actie LIKE 'gateway-storing%' AND tijd>=?", (tijd,)).fetchone()["c"]
+
+    def verkiezing_vastleggen(naam, datum):
+        regels = huidige_regels()
+        if not regels:
+            return None
+        eerste = min((r["ontvangen"] for r in regels if r["ontvangen"]), default=None)
+        cur = db().execute("INSERT INTO verkiezing (naam, datum, vastgelegd_op, storingen) VALUES (?,?,?,?)",
+                           (naam[:80], datum, nu(app), storingen_sinds(eerste)))
+        for r in regels:
+            db().execute("INSERT INTO verkiezing_regel (verkiezing_id, nummer, naam, route_nummer, ontvangen, toegewezen, geaccepteerd, klaar)"
+                         " VALUES (?,?,?,?,?,?,?,?)", (cur.lastrowid, r["nummer"], r["naam"], r["route_nummer"], r["ontvangen"],
+                                                       r["toegewezen"], r["geaccepteerd"], r["klaar"]))
+        audit(f"rapportage vastgelegd: {naam[:80]} ({len(regels)} berichten)")
+        return cur.lastrowid
+
+    def rapport_voor(vid):
+        """Geeft (titel, rapport) voor 'huidig' of een vastgelegde verkiezing; None als die niet bestaat."""
+        if vid == "huidig":
+            regels = huidige_regels()
+            eerste = min((r["ontvangen"] for r in regels if r["ontvangen"]), default=None)
+            return "Huidige gegevens", rapport.maak_rapport(regels, storingen_sinds(eerste))
+        v = db().execute("SELECT * FROM verkiezing WHERE id=?", (vid,)).fetchone() if str(vid).isdigit() else None
+        if not v:
+            return None
+        regels = [dict(r) for r in db().execute("SELECT nummer, naam, route_nummer, ontvangen, toegewezen, geaccepteerd, klaar "
+                                                "FROM verkiezing_regel WHERE verkiezing_id=? ORDER BY ontvangen, id", (v["id"],))]
+        return f"{v['naam']} ({v['datum']})", rapport.maak_rapport(regels, v["storingen"])
+
+    @app.get("/rapportage")
+    @rol_vereist("beheerder", "coordinator")
+    def rapportage():
+        lijst = db().execute("SELECT v.*, (SELECT COUNT(*) FROM verkiezing_regel x WHERE x.verkiezing_id=v.id) AS aantal "
+                             "FROM verkiezing v ORDER BY v.datum DESC, v.id DESC").fetchall()
+        n = db().execute("SELECT COUNT(*) c FROM bericht").fetchone()["c"]
+        return render_template("rapportage_lijst.html", lijst=lijst, n=n, vandaag=nu(app)[:10])
+
+    @app.post("/rapportage/vastleggen")
+    @rol_vereist("beheerder")
+    def rapportage_vastleggen():
+        naam = request.form.get("naam", "").strip()
+        datum = request.form.get("datum", "").strip()
+        if not naam or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", datum):
+            flash("Geef een naam en een datum op.")
+            return redirect(url_for("rapportage"))
+        vid = verkiezing_vastleggen(naam, datum)
+        if vid is None:
+            flash("Er zijn nog geen berichten om vast te leggen.")
+            return redirect(url_for("rapportage"))
+        flash("Rapportage vastgelegd. Je kunt nu eventueel opruimen.")
+        return redirect(url_for("rapportage_toon", vid=vid))
+
+    @app.get("/rapportage/<vid>")
+    @rol_vereist("beheerder", "coordinator")
+    def rapportage_toon(vid):
+        r = rapport_voor(vid)
+        if r is None:
+            abort(404)
+        return render_template("rapportage.html", titel=r[0], r=r[1], vid=vid, duur=rapport.duur)
+
+    @app.post("/rapportage/<int:vid>/verwijder")
+    @rol_vereist("beheerder")
+    def rapportage_verwijder(vid):
+        v = db().execute("SELECT naam FROM verkiezing WHERE id=?", (vid,)).fetchone()
+        if v:
+            db().execute("DELETE FROM verkiezing WHERE id=?", (vid,))
+            audit(f"rapportage verwijderd: {v['naam']}")
+        return redirect(url_for("rapportage"))
+
+    @app.get("/rapportage/<vid>/excel")
+    @rol_vereist("beheerder", "coordinator")
+    def rapportage_excel(vid):
+        from flask import send_file
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        x = rapport_voor(vid)
+        if x is None:
+            abort(404)
+        titel, r = x
+        d = rapport.duur
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Samenvatting"
+        rijen = [("Rapportage", titel), ("Berichten", r["berichten"]), ("Herkend", r["herkend"]), ("Niet herkend", r["onbekend"]),
+                 ("Klaar", r["klaar"]), ("Nog open", r["open"]), ("Stembureaus met melding", r["stembureaus"]),
+                 ("Stembureaus klaar", r["stembureaus_klaar"]), ("Stembureaus met meer dan één melding", r["stembureaus_dubbel"]),
+                 ("Eerste bericht ontvangen", r["eerste_ontvangen"] or ""), ("Laatste klaar", r["laatste_klaar"] or ""),
+                 ("Totale looptijd", d(r["looptijd"])), ("Gateway-storingen", r["storingen"]), ("", "")]
+        for naam, k in (("Ontvangen tot toegewezen", "wacht"), ("Toegewezen tot klaar", "rit"), ("Ontvangen tot klaar", "totaal"),
+                        ("Toegewezen tot geaccepteerd", "accept")):
+            st = r[k]
+            rijen += [(naam + " – gemiddeld", d(st["gem"])), (naam + " – mediaan", d(st["mediaan"])),
+                      (naam + " – langste", d(st["max"])), (naam + " – kortste", d(st["min"]))]
+        for rij in rijen:
+            ws.append(list(rij))
+        ws.column_dimensions["A"].width = 46
+        ws.column_dimensions["B"].width = 30
+        for c in ws["A"]:
+            c.font = Font(bold=True)
+
+        def blad(naam, kop, rijen_, breedtes):
+            w = wb.create_sheet(naam)
+            w.append(kop)
+            for c in w[1]:
+                c.font = Font(bold=True)
+            for rij in rijen_:
+                w.append(rij)
+            for kol, b in zip("ABCDEFGHIJ", breedtes):
+                w.column_dimensions[kol].width = b
+            w.freeze_panes = "A2"
+        blad("Per stembureau", ["Nummer", "Naam", "Route", "Meldingen", "Ontvangen", "Toegewezen", "Klaar", "Wachttijd (min)", "Toegewezen tot klaar (min)", "Totaal (min)"],
+             [[s["nummer"], s["naam"], s["route"], s["meldingen"], s["ontvangen"] or "", s["toegewezen"] or "", s["klaar"] or "",
+               round(s["wacht"] / 60, 1) if s["wacht"] is not None else "", round(s["rit"] / 60, 1) if s["rit"] is not None else "",
+               round(s["totaal"] / 60, 1) if s["totaal"] is not None else ""] for s in r["alle_stembureaus"]],
+             (10, 28, 8, 11, 20, 20, 20, 16, 26, 13))
+        blad("Per route", ["Route", "Berichten", "Klaar", "Gem. toegewezen tot klaar (min)", "Langste (min)"],
+             [[x["route"], x["berichten"], x["klaar"], round(x["rit"]["gem"] / 60, 1) if x["rit"]["gem"] is not None else "",
+               round(x["rit"]["max"] / 60, 1) if x["rit"]["max"] is not None else ""] for x in r["per_route"]], (8, 11, 8, 32, 15))
+        blad("Per uur", ["Uur", "Ontvangen", "Klaar"], [[f"{u['uur']:02d}:00", u["ontvangen"], u["klaar"]] for u in r["per_uur"]], (9, 11, 8))
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        audit(f"rapportage gedownload: {titel}")
+        resp = send_file(buf, as_attachment=True, download_name="rapportage.xlsx",
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
     # ---------- opruimen na de verkiezing ----------
     def opruim_aantallen():
         c = db()
@@ -1181,6 +1320,11 @@ def create_app(config=None):
             flash("Typ OPRUIMEN om te bevestigen. Er is niets gewist.")
             return redirect(url_for("beheer_opruimen"))
         c = db()
+        vastleg = request.form.get("vastleg_naam", "").strip()
+        if vastleg and "berichten" in keuze:
+            if verkiezing_vastleggen(vastleg, nu(app)[:10]) is None:
+                flash("Er zijn geen berichten om vast te leggen; er is niets gewist.")
+                return redirect(url_for("beheer_opruimen"))
         veiligheid = None
         if "backups" not in keuze:
             c.commit()

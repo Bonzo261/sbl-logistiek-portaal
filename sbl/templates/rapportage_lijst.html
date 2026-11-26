@@ -1,0 +1,16 @@
+{% extends "basis.html" %}{% block inhoud %}<h1>Rapportage</h1>
+<div class="kaart"><h2>Huidige gegevens</h2>
+<p class="klein">{{ n }} bericht{{ 'en' if n != 1 }} in het portaal.</p>
+<div class="rij"><a class="knop" href="{{ url_for('rapportage_toon', vid='huidig') }}">Rapport bekijken</a>
+<a class="knop grijs" href="{{ url_for('rapportage_excel', vid='huidig') }}">Excel</a></div>
+{% if gebruiker.rol == 'beheerder' %}<hr>
+<form method="post" action="{{ url_for('rapportage_vastleggen') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<input name="naam" placeholder="Naam, bijv. Gemeenteraad 2026" maxlength="80" size="30" required>
+<input type="date" name="datum" value="{{ vandaag }}" required><button>Verkiezing vastleggen</button></form>
+<p class="klein">Bewaart alleen cijfers per stembureau: nummer, naam, route en tijdstippen. Geen sms-teksten, adressen of telefoonnummers. Daarna kun je het portaal opruimen en blijft het rapport bewaard.</p>{% endif %}</div>
+<div class="kaart"><h2>Vastgelegde verkiezingen</h2>
+{% if lijst %}<table><tr><th>Datum</th><th>Naam</th><th>Berichten</th><th></th></tr>
+{% for v in lijst %}<tr><td>{{ v.datum }}</td><td><a href="{{ url_for('rapportage_toon', vid=v.id) }}">{{ v.naam }}</a></td><td>{{ v.aantal }}</td>
+<td><a href="{{ url_for('rapportage_excel', vid=v.id) }}">Excel</a>
+{% if gebruiker.rol == 'beheerder' %} <form method="post" action="{{ url_for('rapportage_verwijder', vid=v.id) }}" style="display:inline" onsubmit="return confirm('Deze rapportage definitief verwijderen?')"><input type="hidden" name="csrf" value="{{ csrf_token() }}"><button class="rood">Verwijderen</button></form>{% endif %}</td></tr>{% endfor %}</table>
+{% else %}<p class="klein">Nog niets vastgelegd.</p>{% endif %}</div>{% endblock %}

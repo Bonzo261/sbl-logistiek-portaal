@@ -25,6 +25,7 @@ Elke gemeente draait een eigen installatie (geen multi-tenant) op een eigen serv
 - Aantal routes instellen; stembureaus handmatig beheren of importeren uit `.csv`, `.xlsx` of `.ods` (slepen-en-neerzetten, met voorbeeld vóór het opslaan)
 - Gebruikers beheren, ook in bulk: één chauffeursaccount per route (`route1`, `route2`, …) met een tijdelijk wachtwoord dat bij de eerste login gewijzigd moet worden; acties op een selectie gebruikers (nieuw tijdelijk wachtwoord, 2FA resetten, route wijzigen, verwijderen)
 - Back-up: automatisch elke nacht (vanaf 03:00) in de map `backups/` naast de database, met instelbaar aantal te bewaren back-ups; handmatig downloaden en herstellen (*Beheer → Back-up*)
+- Managementrapportage (*Rapportage*): doorlooptijden, welke stembureaus als eerste en laatste klaar waren, per route en per uur; per verkiezing vast te leggen (alleen cijfers) en te downloaden als Excel
 - Logboek van acties
 
 **Bewaking en beveiliging**
@@ -111,7 +112,7 @@ python -m pytest
 De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.py` (routes en logica), `sbl/importer.py`, `sbl/totp.py` en `sbl/templates/`. Bijdragen zijn welkom, zie [`CONTRIBUTING.md`](CONTRIBUTING.md); beveiligingsproblemen meld je volgens [`SECURITY.md`](SECURITY.md).
 
 ## Roadmap
-Automatisch printen (kiosk), optionele Epson ePOS-printer, historie per verkiezing, Postgres.
+Automatisch printen (kiosk), optionele Epson ePOS-printer, Postgres, rapportages van meerdere verkiezingen naast elkaar leggen.
 
 Wensen:
 - Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).

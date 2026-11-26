@@ -8,6 +8,7 @@ Dit document beschrijft welke gegevens het portaal verwerkt en hoe het die besch
 | Naam, adres en telefoonnummer van stembureaus en voorzitters | tabel `stembureau` | Komt uit je eigen import. Telefoonnummers van voorzitters kunnen persoonsgegevens zijn |
 | Inhoud en tijdstip van binnengekomen sms'jes (max. 500 tekens) | tabel `bericht` | Hoort alleen het stembureaunummer te bevatten; een voorzitter kan meer schrijven |
 | Accountnaam, rol, route, optioneel e-mailadres, wachtwoord-hash, 2FA-sleutel | tabel `gebruiker` | Wachtwoorden worden gehasht opgeslagen; herstelcodes als HMAC |
+| Vastgelegde rapportages: stembureaunummer en -naam, route, tijdstippen van ontvangst, toewijzing en afronden | tabellen `verkiezing` en `verkiezing_regel` | Bewust zonder sms-tekst, adres en telefoonnummer. Blijft bewaard na opruimen; verwijder een rapportage onder *Rapportage* |
 | Logboek: tijdstip, gebruiker, actie | tabel `audit` | Bevat geen telefoonnummers of sms-inhoud |
 | Mislukte inlogpogingen en foute sleutels (IP-adres of naam, tijdstip) | tabel `login_poging` | Wordt na 15 minuten opgeruimd |
 | Instellingen, o.a. de webhook-sleutel, de schermsleutel en eventueel het SMTP-wachtwoord | tabel `instelling` | Staan dus ook in back-ups |
