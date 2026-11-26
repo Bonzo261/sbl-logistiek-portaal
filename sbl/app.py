@@ -134,7 +134,7 @@ def create_app(config=None):
 
     @app.before_request
     def csrf_controle():
-        if request.method == "POST" and request.endpoint not in ("api_sms", "api_heartbeat"):
+        if request.method == "POST" and request.endpoint not in ("api_sms", "api_heartbeat", "api_v1_berichten"):
             if not secrets.compare_digest(request.form.get("csrf", ""), session.get("csrf", "x")):
                 abort(400, "Ongeldig formulier (csrf)")
 
@@ -407,27 +407,60 @@ def create_app(config=None):
                 return str(v).strip()
         return ""
 
-    def api_sleutel_controle():
-        """Controleert de webhook-sleutel; blokkeert een IP-adres na te veel foute pogingen (raadaanvallen)."""
-        sleutel = request.headers.get("X-SBL-Sleutel") or request.args.get("sleutel", "")
+    def api_sleutel_controle(verwacht=None, gegeven=None):
+        """Controleert een API-sleutel; blokkeert een IP-adres na te veel foute pogingen (raadaanvallen).
+        Een lege verwachte sleutel betekent: koppeling uit, alles wordt geweigerd."""
+        if verwacht is None:
+            verwacht = instelling("sms_sleutel")
+        if gegeven is None:
+            gegeven = request.headers.get("X-SBL-Sleutel") or request.args.get("sleutel", "")
         k = "api-ip:" + (request.remote_addr or "")
         nu_ts = time.time()
         db().execute("DELETE FROM login_poging WHERE tijd<?", (nu_ts - 900,))
         if db().execute("SELECT COUNT(*) c FROM login_poging WHERE sleutel=?", (k,)).fetchone()["c"] >= 30:
             abort(429)
-        if not secrets.compare_digest(sleutel.encode(), instelling("sms_sleutel").encode()):
+        if not verwacht or not secrets.compare_digest(gegeven.encode(), verwacht.encode()):
             db().execute("INSERT INTO login_poging (tijd, sleutel) VALUES (?,?)", (nu_ts, k))
             abort(403)
+
+    def bericht_opslaan(tekst, nummer=None):
+        """Slaat een binnengekomen bericht op; zoekt het stembureau op nummer (anders het eerste getal in de tekst)."""
+        if nummer is None:
+            m = re.search(r"[0-9]{1,9}", tekst)
+            nummer = int(m.group()) if m else None
+        sb = db().execute("SELECT * FROM stembureau WHERE nummer=?", (nummer,)).fetchone() if nummer is not None else None
+        cur = db().execute("INSERT INTO bericht (stembureau_id, tekst, ontvangen) VALUES (?,?,?)",
+                           (sb["id"] if sb else None, tekst[:500], nu(app)))
+        return cur.lastrowid, sb
 
     @app.post("/api/sms")
     def api_sms():
         api_sleutel_controle()
-        tekst = sms_tekst()
-        m = re.search(r"[0-9]{1,9}", tekst)  # eerste getal in de tekst is het stembureaunummer
-        sb = db().execute("SELECT * FROM stembureau WHERE nummer=?", (int(m.group()),)).fetchone() if m else None
-        cur = db().execute("INSERT INTO bericht (stembureau_id, tekst, ontvangen) VALUES (?,?,?)",
-                           (sb["id"] if sb else None, tekst[:500], nu(app)))
-        return jsonify(ok=True, id=cur.lastrowid, herkend=bool(sb)), 201
+        bid, sb = bericht_opslaan(sms_tekst())
+        return jsonify(ok=True, id=bid, herkend=bool(sb)), 201
+
+    @app.post("/api/v1/berichten")
+    def api_v1_berichten():
+        """Koppeling voor een softwareleverancier: eigen sleutel, los van de sms-gateway.
+        Sleutel in `Authorization: Bearer <sleutel>` of `X-API-Key`. JSON: {"stembureau": 12, "tekst": "..."}."""
+        auth = request.headers.get("Authorization", "")
+        gegeven = auth[7:].strip() if auth.lower().startswith("bearer ") else request.headers.get("X-API-Key", "")
+        api_sleutel_controle(instelling("api_sleutel"), gegeven)
+        d = request.get_json(silent=True)
+        if not isinstance(d, dict):
+            return jsonify(ok=False, fout="Stuur JSON, bijvoorbeeld {\"stembureau\": 12}"), 400
+        tekst = str(d.get("tekst") or d.get("message") or "").strip()
+        nummer = d.get("stembureau")
+        if nummer is not None:
+            if isinstance(nummer, bool) or not re.fullmatch(r"[0-9]{1,9}", str(nummer).strip()):
+                return jsonify(ok=False, fout="'stembureau' moet een nummer zijn"), 400
+            nummer = int(str(nummer).strip())
+            tekst = tekst or str(nummer)
+        elif not tekst:
+            return jsonify(ok=False, fout="Geef 'stembureau' of 'tekst' mee"), 400
+        bid, sb = bericht_opslaan(tekst, nummer)
+        return jsonify(ok=True, id=bid, herkend=bool(sb),
+                       stembureau={"nummer": sb["nummer"], "naam": sb["naam"]} if sb else None), 201
 
     @app.route("/api/heartbeat", methods=["GET", "POST"])
     def api_heartbeat():
@@ -690,7 +723,7 @@ def create_app(config=None):
         return render_template("beheer.html",
                                n_routes=db().execute("SELECT COUNT(*) c FROM route").fetchone()["c"],
                                n_sb=db().execute("SELECT COUNT(*) c FROM stembureau").fetchone()["c"],
-                               gateway=gateway_status(),
+                               gateway=gateway_status(), api_sleutel=instelling("api_sleutel"),
                                sleutel=instelling("sms_sleutel"), storing_s=instelling("storing_seconden", "600"),
                                notificatie_url=instelling("notificatie_url"),
                                mail=mail_config(), mail_via_env=bool(os.environ.get("SBL_SMTP_HOST")),
@@ -718,6 +751,20 @@ def create_app(config=None):
                 db().execute("DELETE FROM route WHERE id=?", (r["id"],))
         audit(f"aantal routes {n}")
         flash(f"Aantal routes ingesteld op {n}.")
+        return redirect(url_for("beheer"))
+
+    @app.post("/beheer/api-sleutel")
+    @rol_vereist("beheerder")
+    def beheer_api_sleutel():
+        actie = request.form.get("actie")
+        if actie == "nieuw":
+            zet_instelling("api_sleutel", "sbl_" + secrets.token_urlsafe(32))
+            audit("api-sleutel (leverancier) aangemaakt of vernieuwd")
+            flash("API-sleutel aangemaakt. De vorige sleutel werkt niet meer.")
+        elif actie == "uit":
+            zet_instelling("api_sleutel", "")
+            audit("api-sleutel (leverancier) ingetrokken")
+            flash("API-koppeling uitgezet.")
         return redirect(url_for("beheer"))
 
     @app.post("/beheer/instellingen")

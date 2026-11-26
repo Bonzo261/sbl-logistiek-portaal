@@ -799,3 +799,30 @@ def test_opruimen_backups_en_chauffeurs(client):
     assert "1</" in client.get("/beheer/opruimen").get_data(as_text=True)
     r = client.post("/beheer/opruimen", data={"csrf": t, "backups": "1", "chauffeurs": "1", "bevestig": "OPRUIMEN"}, follow_redirects=True)
     assert "Opgeruimd" in r.get_data(as_text=True) and "1 backups" in r.get_data(as_text=True)
+
+
+def test_api_v1_leverancier(client):
+    import sqlite3
+    maak_admin(client)
+    t = token(client)
+    kop = {"Content-Type": "application/json"}
+    # uit: alles geweigerd, ook een lege sleutel
+    assert client.post("/api/v1/berichten", json={"stembureau": 1}).status_code == 403
+    assert client.post("/api/v1/berichten", json={"stembureau": 1}, headers={"X-API-Key": ""}).status_code == 403
+    client.post("/beheer/api-sleutel", data={"csrf": t, "actie": "nieuw"})
+    con = sqlite3.connect(client.application.config["DATABASE"])
+    key = con.execute("SELECT value FROM instelling WHERE key='api_sleutel'").fetchone()[0]
+    con.execute("INSERT INTO stembureau (nummer, naam) VALUES (42, 'Test')"); con.commit(); con.close()
+    h = {"Authorization": "Bearer " + key}
+    r = client.post("/api/v1/berichten", json={"stembureau": 42}, headers=h)
+    assert r.status_code == 201 and r.get_json()["herkend"] and r.get_json()["stembureau"]["nummer"] == 42
+    assert client.post("/api/v1/berichten", json={"tekst": "99"}, headers={"X-API-Key": key}).get_json()["herkend"] is False
+    assert client.post("/api/v1/berichten", json={"stembureau": "abc"}, headers=h).status_code == 400
+    assert client.post("/api/v1/berichten", json={}, headers=h).status_code == 400
+    assert client.post("/api/v1/berichten", data="x", headers=h).status_code == 400
+    assert client.post("/api/v1/berichten", json={"stembureau": 42}, headers={"Authorization": "Bearer fout"}).status_code == 403
+    # de sms-sleutel werkt niet voor de API en andersom
+    assert client.post("/api/v1/berichten?sleutel=" + sleutel(client), json={"stembureau": 42}).status_code == 403
+    assert client.post("/api/sms?sleutel=" + key, data={"message": "1"}).status_code == 403
+    client.post("/beheer/api-sleutel", data={"csrf": t, "actie": "uit"})
+    assert client.post("/api/v1/berichten", json={"stembureau": 42}, headers=h).status_code == 403

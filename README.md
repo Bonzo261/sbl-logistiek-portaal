@@ -86,6 +86,18 @@ Onder *Beheer → E-mail* stel je een SMTP-server in: server, poort, beveiliging
 ## Sms-forwarder koppelen
 Stel in de forwarder een **POST**-webhook in naar de URL onder *Beheer* (`/api/sms?sleutel=…`). De tekst mag in het veld `message`, `text`, `body`, `tekst` of `content` staan, als formulier of JSON; alleen het stembureaunummer is nodig. Voor de bewaking: laat de forwarder regelmatig (GET of POST) `/api/heartbeat?sleutel=…` aanroepen. Na de ingestelde tijd zonder ping (standaard 600 seconden) volgt een storingsmelding. Vul een meldings-URL in (bijv. een geheime ntfy-topic) voor een push naar de telefoon. De sleutel kun je onder *Beheer* vernieuwen.
 
+## API voor een softwareleverancier
+Naast de sms-webhook is er een aparte koppeling met een eigen sleutel (*Beheer → Koppeling voor een softwareleverancier*). Standaard staat die uit; zonder sleutel wordt alles geweigerd. De sleutel kun je vernieuwen of intrekken zonder de sms-gateway aan te passen.
+
+```
+POST /api/v1/berichten
+Authorization: Bearer <sleutel>        (of: X-API-Key: <sleutel>)
+Content-Type: application/json
+
+{"stembureau": 12}                      of  {"tekst": "12"}
+```
+Antwoord `201`: `{"ok": true, "id": 57, "herkend": true, "stembureau": {"nummer": 12, "naam": "School A"}}`. Een onbekend nummer geeft `herkend: false`; het bericht komt dan als niet herkend binnen. Foutcodes: `400` ongeldige invoer, `403` onjuiste of ontbrekende sleutel, `429` te veel foute pogingen vanaf één IP-adres. Zet de sleutel nooit in de URL, zodat hij niet in logs terechtkomt.
+
 ## Import
 Kopregel verplicht. Herkende kolommen: `nummer` (of `sbNummers`), `naam` (of `locatie`), `adres` (of `straat`/`huisnummer`/`toevoeging`/`postcode`/`plaats`), `telefoon`, `route`. Een weggevallen voorloopnul in een telefoonnummer wordt hersteld. Bestaande stembureaus worden bijgewerkt; optioneel kun je eerst alles wissen.
 

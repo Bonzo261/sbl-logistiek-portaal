@@ -33,6 +33,9 @@ Stel het aantal routes in. Een route die nog stembureaus of openstaande berichte
 - **Meldings-URL**: bijvoorbeeld een geheime ntfy-topic. Je krijgt een pushbericht bij een storing en bij herstel.
 - **Webhook-sleutel**: kies *huidige behouden*, *nieuwe veilige sleutel* of *zelf invullen*. Een zelfgekozen sleutel is makkelijk te raden; gebruik die alleen om te testen. Na het wijzigen moet de sleutel ook in de gateway aangepast worden.
 
+## Koppeling voor een leverancier (API)
+Voor een softwareleverancier die zelf berichten wil aanleveren: *Beheer → Koppeling voor een softwareleverancier → API-koppeling aanzetten*. Je krijgt een eigen sleutel en het adres `…/api/v1/berichten`. Geef beide aan de leverancier, bij voorkeur via een veilig kanaal. De leverancier meldt een stembureaunummer met een JSON-verzoek (zie de README voor het voorbeeld). Het bericht verschijnt dan net als een sms in het portaal. Heb je de sleutel gedeeld met de verkeerde, of is de samenwerking voorbij: *Nieuwe sleutel genereren* of *Uitzetten* maakt de oude sleutel meteen ongeldig. De sms-gateway merkt daar niets van.
+
 ## Overzichtsscherm
 `/scherm` toont op een grote monitor per route het aantal open opdrachten (kleur op wachttijd), wachtende berichten, klaar vandaag en een storingsbalk. Ingelogd werkt het meteen. Voor een scherm dat niet ingelogd hoeft te zijn maak je een **geheime link**. Die toont alleen nummers, namen en wachttijden, geen adressen of telefoonnummers. Wie de link heeft kan meekijken: deel hem niet en trek hem in als hij uitlekt. Instelbaar is de wachttijd waarna een route oranje en rood wordt.
 

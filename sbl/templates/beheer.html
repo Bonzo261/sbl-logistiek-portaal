@@ -32,6 +32,16 @@ Heartbeat (GET of POST): <code>{{ request.url_root }}api/heartbeat?sleutel={{ sl
 <label><input type="radio" name="sleutel_modus" value="eigen"> zelf invullen <input name="eigen_sleutel" placeholder="bijv. test123" maxlength="64" size="20"></label>
 <p class="klein" style="flex-basis:100%;border-left:4px solid var(--oranje);padding-left:8px"><b>Waarschuwing:</b> een zelfgekozen sleutel is makkelijk te raden. Iedereen die hem kent kan nepberichten naar het portaal sturen. Gebruik dit alleen om te testen en genereer daarna weer een veilige sleutel.</p></fieldset>
 <button>Opslaan</button></form></div>
+<div class="kaart"><h2>Koppeling voor een softwareleverancier (API)</h2>
+<p class="klein">Los van de sms-gateway, met een eigen sleutel die je kunt intrekken zonder de gateway aan te passen. De leverancier stuurt een <code>POST</code> met JSON naar:<br><code>{{ request.url_root }}api/v1/berichten</code></p>
+{% if api_sleutel %}<p><b>API-sleutel:</b> <code style="word-break:break-all">{{ api_sleutel }}</code></p>
+<p class="klein">Meesturen in de header <code>Authorization: Bearer &lt;sleutel&gt;</code> (of <code>X-API-Key</code>). Zet de sleutel nooit in de URL.<br>
+Voorbeeld:<br><code style="word-break:break-all">curl -X POST {{ request.url_root }}api/v1/berichten -H "Authorization: Bearer {{ api_sleutel }}" -H "Content-Type: application/json" -d '{"stembureau": 12}'</code><br>
+Velden: <code>stembureau</code> (nummer) en/of <code>tekst</code>. Antwoord: <code>{"ok":true,"id":…,"herkend":true,"stembureau":{"nummer":…,"naam":…}}</code>.</p>
+{% else %}<p class="klein">Staat uit: zonder sleutel wordt elk verzoek geweigerd.</p>{% endif %}
+<form method="post" action="{{ url_for('beheer_api_sleutel') }}" class="rij"><input type="hidden" name="csrf" value="{{ csrf_token() }}">
+<button name="actie" value="nieuw" class="grijs">{{ 'Nieuwe sleutel genereren' if api_sleutel else 'API-koppeling aanzetten' }}</button>
+{% if api_sleutel %}<button name="actie" value="uit" class="rood">Uitzetten</button>{% endif %}</form></div>
 <div class="kaart"><h2>Overzichtsscherm (wand)</h2>
 <p class="klein">Open <a href="{{ url_for('scherm') }}">/scherm</a> op een groot scherm. Ingelogd als coördinator of beheerder werkt het meteen. Voor een scherm dat niet ingelogd hoeft te zijn kun je een geheime link aanmaken; die toont alleen stembureaunummers, namen en wachttijden (geen adressen of telefoonnummers). Wie de link heeft, kan meekijken: deel hem niet en trek hem in als hij uitlekt.</p>
 {% if scherm_sleutel %}<p><code style="word-break:break-all">{{ request.url_root }}scherm?sleutel={{ scherm_sleutel }}</code></p>{% endif %}

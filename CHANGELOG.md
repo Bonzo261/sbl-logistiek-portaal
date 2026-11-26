@@ -8,6 +8,7 @@ Eerste versie, losgemaakt van Home Assistant.
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- API voor een softwareleverancier: `POST /api/v1/berichten` met een eigen sleutel (Bearer of `X-API-Key`), los van de sms-gateway; aan te zetten, te vernieuwen en in te trekken in Beheer
 - Beheer → Opruimen: na de verkiezing berichten, chauffeursaccounts, stembureaus, logboek en automatische back-ups wissen (met bevestiging en een back-up vooraf)
 - Beveiliging: Content-Security-Policy, Permissions-Policy, HSTS en `no-store` op alle pagina's; begrenzing van foute webhook-sleutels per IP-adres; document `docs/PRIVACY-EN-BEVEILIGING.md`
 - Fout opgelost: een sms met bijzondere cijfertekens (zoals ²) of een zeer lange reeks cijfers kon een serverfout geven; het stembureaunummer is nu het eerste getal in de sms
