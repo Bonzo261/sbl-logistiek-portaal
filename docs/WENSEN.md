@@ -61,6 +61,11 @@ Drie wensen die samen één onderdeel vormen, samen met "Spullen registreren" hi
 
 **Inschatting:** klein (een dag), nadat onderdeel 2 bestaat.
 
+### Uitgangspunt: een optionele module
+De stembescheiden-onderdelen komen als **module die je in Beheer aan of uit zet** (standaard uit). Zolang de module uit staat, verandert er niets: geen extra stappen of velden voor de chauffeur, geen extra pagina's of menu-items, en de bestaande werkwijze en rapportage blijven precies zoals ze nu zijn. Zet je de module later uit, dan blijven de ingevoerde gegevens bewaard.
+
+Zo kan een gemeente die alleen de logistiek van de routes wil, de app ongewijzigd blijven gebruiken, en kan een gemeente die ook de stembescheiden wil bijhouden de module aanzetten. De module wordt pas gebouwd als de vraag er daadwerkelijk komt; dit is vastgelegd om er bij het ontwerpen van de basis rekening mee te houden (bijvoorbeeld door de nieuwe tabellen los te houden van de bestaande).
+
 ### Open vragen
 - Decentrale of centrale stemopneming (DSO of CSO)? Dat bepaalt wat er fysiek naar de centrale locatie gaat.
 - Welke soorten stembescheiden per verkiezing precies (stembussen of transportboxen, enveloppen met proces-verbaal, overige)?
