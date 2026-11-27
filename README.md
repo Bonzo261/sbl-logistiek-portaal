@@ -115,6 +115,7 @@ De code is bewust klein gehouden: Flask + SQLite, geen build-stap. Zie `sbl/app.
 Automatisch printen (kiosk), optionele Epson ePOS-printer, Postgres (alleen nodig bij heel veel gelijktijdig gebruik of een eis van de organisatie), rapportages van meerdere verkiezingen naast elkaar leggen.
 
 Wensen:
+- Spullen registreren bij het ophalen: de chauffeur geeft op de locatie aan wat hij meeneemt (aantal tassen, kratten en stembussen). Zie de haalbaarheid in `docs/WENSEN.md`.
 - Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).
 
 ## Licentie
