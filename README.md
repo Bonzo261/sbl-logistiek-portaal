@@ -120,6 +120,7 @@ Wensen:
   - Controle op de centrale locatie: wat de chauffeur heeft ingevuld naast wat er daadwerkelijk wordt ontvangen, met afwijkingen.
   - Invoer voor het overdrachtsdocument (Model N 5) per verkiezing, op basis van de ontvangen stukken.
   - Spullen registreren bij het ophalen: de chauffeur geeft op de locatie aan wat hij meeneemt (aantal tassen, kratten en stembussen). Zie de haalbaarheid in `docs/WENSEN.md`.
+- Android-app voor chauffeurs (betere meldingen en eventueel locatie); eerst Web Push via de bestaande site, zie `docs/WENSEN.md`.
 - Pushmeldingen bij een vergrendelde telefoon (Web Push; op iOS alleen als de site op het beginscherm staat).
 
 ## Licentie

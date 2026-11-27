@@ -78,3 +78,32 @@ Zo kan een gemeente die alleen de logistiek van de routes wil, de app ongewijzig
 2. Controle op de centrale locatie met afwijkingen.
 3. Invoer voor het overdrachtsdocument.
 4. Rapportage uitbreiden met de uitkomsten van de controle.
+
+## Android-app voor chauffeurs (meldingen en locatie)
+**Wens:** een Android-app waarmee chauffeurs inloggen, zodat meldingen beter aankomen. Met toegang tot de locatie zou je chauffeurs ook kunnen volgen.
+
+**Haalbaarheid: kan, maar het is zwaarder dan het lijkt, en voor de meldingen is geen app nodig.**
+
+### Meldingen
+- Een gewone website kan op Android al pushmeldingen sturen (Web Push), ook bij een vergrendeld scherm en een gesloten browser. Daarvoor is geen eigen app nodig. De site moet als app op het beginscherm worden gezet (progressive web app). Op iOS werkt Web Push alleen als de site op het beginscherm staat.
+- Dat is veel goedkoper dan een eigen app: een service worker, een sleutelpaar voor de server en een knop "meldingen aanzetten". Dit staat al als wens (*Pushmeldingen bij een vergrendelde telefoon*). Geen Google-account of app-winkel nodig.
+- Een eigen app verbetert dit niet vanzelf. Ook een app moet pushmeldingen via Google (Firebase) laten lopen, wat voor een zelf te hosten open-sourceproject een extra afhankelijkheid en een Firebase-project per gemeente betekent. Batterij-optimalisatie van de telefoon blijft een risico, ook bij een app.
+
+### Locatie volgen
+- **Techniek:** een website kan alleen de locatie bepalen zolang de pagina op het scherm open staat. Doorlopend volgen op de achtergrond kan alleen met een echte app (met een voorgrondservice en toestemming voor locatie op de achtergrond). Dat kost batterij en google toetst zulke apps streng bij publicatie in de Play Store.
+- **Privacy (belangrijk):** locatiegegevens van personen zijn persoonsgegevens. Chauffeurs volgen heeft een wettelijke grondslag en een duidelijk doel nodig, een DPIA ligt voor de hand, bij medewerkers is vaak instemming van de ondernemingsraad nodig, en je moet de bewaartermijn beperken en chauffeurs vooraf informeren. Het is geen pure techniek-vraag.
+- **Lichtere varianten:** alleen een locatiestempel op het moment van accepteren of klaar (eenmalig, met toestemming), of delen van de locatie zolang de chauffeur een route heeft en de pagina open staat. Dat geeft het overzicht dat de coördinator wil, zonder doorlopend volgen.
+
+### Een eigen app bouwen
+- Een aparte codebasis (bijvoorbeeld Kotlin), een Play Store-account met eenmalige kosten, privacyverklaring, goedkeuring en blijvend onderhoud bij elke Android-versie. Voor een open-sourceproject met veel gemeenten betekent dat ook beheer van de bouw en ondertekening.
+- Een lichte tussenvorm is een app die alleen de website verpakt (Trusted Web Activity). Die staat in de Play Store en gebruikt Web Push, maar heeft dezelfde beperkingen voor locatie op de achtergrond als de website.
+
+### Voorgestelde volgorde
+1. **Web Push met installeerbare site (progressive web app).** Lost de meldingen waarschijnlijk op, voor Android en iOS, tegen lage kosten.
+2. **Optioneel en uit by default:** locatiestempel bij accepteren en klaar, met uitleg en toestemming.
+3. **Eigen app alleen** als blijkt dat Web Push onvoldoende betrouwbaar is of als doorlopend volgen echt nodig is, en pas na een privacybeoordeling.
+
+### Open vragen
+- Is het probleem dat meldingen nu niet aankomen, of dat ze te laat aankomen? Op welke toestellen?
+- Wat moet de coördinator met de locatie kunnen: weten waar iemand is, de aankomsttijd schatten, of controleren of iemand bij het stembureau was?
+- Zijn de chauffeurs vrijwilligers, uitzendkrachten of medewerkers, en is er een ondernemingsraad?
