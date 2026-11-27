@@ -2,13 +2,19 @@
 
 Alle noemenswaardige wijzigingen worden hier bijgehouden. Opzet volgens [Keep a Changelog](https://keepachangelog.com/nl/); versies worden als git-tag (`v1.0.0`) en als Docker-image met dezelfde tag gepubliceerd.
 
+## [1.0.1] – 2026-11-27
+### Gewijzigd
+- Docker: gunicorn draait met threads (2 werkers × 4 threads), zodat een traag of leeg verzoek de app niet blokkeert
+- `docker-compose.yml` publiceert poort 8000 alleen op 127.0.0.1; de installatiehandleiding waarschuwt dat de poort niet open naar het internet mag staan (scanners, omzeilen van HTTPS en van de inlogblokkade via `X-Forwarded-For`)
+
+> Bijwerken: geen aanpassingen nodig. Controleer wel dat poort 8000 van je container alleen op `127.0.0.1` is gepubliceerd.
+
 ## [1.0.0] – 2026-11-26
 Eerste versie, losgemaakt van Home Assistant.
 
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
-- Docker: gunicorn draait met threads (gthread, 2 workers × 4 threads), zodat een traag of leeg verzoek de app niet blokkeert; `docker-compose.yml` publiceert poort 8000 alleen op 127.0.0.1
 - Database: WAL-modus en langere wachttijd bij gelijktijdige toegang, zodat veel verversende schermen schrijfacties niet vertragen
 - Rapportage (managementrapport): doorlooptijden (gemiddeld, mediaan, langste), welke stembureaus als eerste en laatste klaar waren, per route en per uur, download als Excel; per verkiezing vast te leggen als cijfers zonder persoonsgegevens, ook vanuit Opruimen
 - De knop "Print" is uit het portaal gehaald; de afdrukpagina zelf blijft in de code voor later printen
