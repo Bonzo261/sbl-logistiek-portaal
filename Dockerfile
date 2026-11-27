@@ -6,4 +6,4 @@ COPY . .
 ENV SBL_DATABASE=/data/sbl.db
 VOLUME /data
 EXPOSE 8000
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "wsgi:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "2", "-k", "gthread", "--threads", "4", "--timeout", "30", "wsgi:app"]

@@ -2,7 +2,7 @@ services:
   sbl:
     build: .
     restart: unless-stopped
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]   # alleen via de reverse proxy bereikbaar
     volumes: ["./data:/data"]
     environment:
       SBL_HTTPS: "1"   # zet op 0 als je (tijdelijk) zonder HTTPS test

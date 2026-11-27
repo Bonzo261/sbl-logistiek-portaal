@@ -21,7 +21,7 @@ docker run -d --name sbl --restart unless-stopped -p 127.0.0.1:8000:8000 \
 Let op bij Portainer of een andere beheertool:
 - Het volume moet op `/data` in de container staan, anders raakt de database bij een nieuwe container kwijt.
 - Zet `SBL_HTTPS=1` en `SBL_PROXY=1` bij de omgevingsvariabelen.
-- Publiceer poort 8000, bij voorkeur alleen op `127.0.0.1`.
+- Publiceer poort 8000 **alleen op `127.0.0.1`** (in Portainer: host-IP `127.0.0.1`). Staat de poort open naar het internet, dan krijg je regelmatig meldingen van scanners in het log ("Invalid HTTP request line") en omzeilt iedereen je HTTPS-proxy.
 
 ### Zonder Docker
 ```
@@ -41,7 +41,7 @@ ProxyPass /.well-known !
 ProxyPass / http://127.0.0.1:8000/
 ProxyPassReverse / http://127.0.0.1:8000/
 ```
-Zet `SBL_PROXY=1` alleen aan als de app niet rechtstreeks van buiten bereikbaar is.
+Zet `SBL_PROXY=1` alleen aan als de app niet rechtstreeks van buiten bereikbaar is. Anders kan iemand het IP-adres in de `X-Forwarded-For`-header vervalsen en daarmee de blokkade na foute inlogpogingen omzeilen. Controleer na de installatie van buitenaf (niet via de proxy) dat `http://jouw-server:8000` niet bereikbaar is.
 
 ## 4. Eerste keer instellen
 1. Open het webadres. Je komt op de pagina om het eerste **beheerdersaccount** aan te maken (wachtwoord minimaal 10 tekens).

@@ -8,6 +8,7 @@ Eerste versie, losgemaakt van Home Assistant.
 > Let op bij bijwerken: iedereen moet na deze update één keer opnieuw inloggen.
 
 ### Toegevoegd
+- Docker: gunicorn draait met threads (gthread, 2 workers × 4 threads), zodat een traag of leeg verzoek de app niet blokkeert; `docker-compose.yml` publiceert poort 8000 alleen op 127.0.0.1
 - Database: WAL-modus en langere wachttijd bij gelijktijdige toegang, zodat veel verversende schermen schrijfacties niet vertragen
 - Rapportage (managementrapport): doorlooptijden (gemiddeld, mediaan, langste), welke stembureaus als eerste en laatste klaar waren, per route en per uur, download als Excel; per verkiezing vast te leggen als cijfers zonder persoonsgegevens, ook vanuit Opruimen
 - De knop "Print" is uit het portaal gehaald; de afdrukpagina zelf blijft in de code voor later printen
